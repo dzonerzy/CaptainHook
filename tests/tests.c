@@ -79,8 +79,19 @@ unsigned int __stdcall test4i(int f1, int f2, int f3, int f4)
 
 int main(int argc, char **argv)
 {
-    test4i(1, 2, 3, 4);
-    cpthk_find_calling_convention((uintptr_t)test4i);
+    if (!cpthk_init())
+    {
+        LOG_ERROR("Failed to initialize cpthook", NULL);
+        return 1;
+    }
+
+    if (!cpthk_hook((uintptr_t)test4f, NULL, NULL))
+    {
+        LOG_ERROR("Failed to hook test4f", NULL);
+        return 1;
+    }
+
     system("pause");
+    test4i(1, 2, 3, 4);
     return 0;
 }

@@ -138,4 +138,4 @@ typedef enum _TRACE_POINT
     TRACE_POINT_RETURN,
 } TRACE_POINT;
 
-PCALLING_CONVENTION cpthk_find_calling_convention(uintptr_t Address);
+PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH Cfg);

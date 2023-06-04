@@ -474,10 +474,15 @@ PXREFS cpthk_find_xref(uintptr_t Address)
 
     cpthk_get_text_section(&textSectionAddress, &textSectionSize);
 
+    printf("Text section address: 0x%llx\n", textSectionAddress);
+    printf("Text section size: 0x%llx\n", textSectionSize);
+
     for (uintptr_t i = textSectionAddress;;)
     {
-        if (i >= (textSectionAddress + textSectionSize) - 15)
+        if (i > (textSectionAddress + textSectionSize) - 15)
         {
+            printf("Reached end of text section at 0x%llx\n", i);
+            system("pause");
             break;
         }
 
@@ -501,6 +506,7 @@ PXREFS cpthk_find_xref(uintptr_t Address)
                     uintptr_t CallAddress = FD_OP_IMM(&instr, 0);
                     if (CallAddress == Address)
                     {
+                        printf("CALL\n");
                         xrefs->Size++;
                         xrefs->Entries = realloc(xrefs->Entries, sizeof(XREF) * xrefs->Size);
                         xrefs->Entries[xrefs->Size - 1].Address = i - ret;
@@ -517,6 +523,7 @@ PXREFS cpthk_find_xref(uintptr_t Address)
                         uintptr_t CallAddress = FD_OP_DISP(&instr, 1) + i;
                         if (CallAddress == Address)
                         {
+                            printf("LEA\n");
                             xrefs->Size++;
                             xrefs->Entries = realloc(xrefs->Entries, sizeof(XREF) * xrefs->Size);
                             xrefs->Entries[xrefs->Size - 1].Address = i - ret;

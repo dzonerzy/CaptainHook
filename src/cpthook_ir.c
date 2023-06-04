@@ -650,7 +650,7 @@ PINST_TRACE_LIST cpthk_get_trace(PCONTROL_FLOW_GRAPH Cfg, TRACE_POINT point, PIN
     switch (point)
     {
     case TRACE_POINT_CALLER:
-        xrefs = cpthk_find_xref(Cfg->Head->Address);
+        xrefs = cpthk_find_xref(Cfg->Address);
 
         if (!xrefs)
             return NULL;
@@ -665,6 +665,8 @@ PINST_TRACE_LIST cpthk_get_trace(PCONTROL_FLOW_GRAPH Cfg, TRACE_POINT point, PIN
                 break;
             }
         }
+
+        printf("idx: %d\n", idx);
 
         if (idx == -1)
         {
@@ -745,15 +747,8 @@ PINST_TRACE_LIST cpthk_get_trace(PCONTROL_FLOW_GRAPH Cfg, TRACE_POINT point, PIN
     }
 }
 
-PCALLING_CONVENTION cpthk_find_calling_convention(uintptr_t Address)
+PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
 {
-    PCONTROL_FLOW_GRAPH cfg = cpthk_build_cfg(Address);
-
-    if (!cfg)
-    {
-        return NULL;
-    }
-
     TEMU_CPU_CONTEXT cpu;
     cpthk_emu_reset_regs(&cpu);
 
@@ -793,7 +788,7 @@ PCALLING_CONVENTION cpthk_find_calling_convention(uintptr_t Address)
     free(cfg);
     free(returnCallingConvention);
 
-    printf("Calling convention:\n");
+    /*printf("Calling convention:\n");
     printf("  Return register: %d\n", paramCallingConvention->ReturnRegister);
     printf("  Argument count: %d\n", paramCallingConvention->ArgumentsCount);
     printf("  Arguments:\n");
@@ -804,7 +799,7 @@ PCALLING_CONVENTION cpthk_find_calling_convention(uintptr_t Address)
         printf("        %d: %s\n", i, buf);
     }
     printf("  EntryHookAddress: %p\n", paramCallingConvention->EntryHookAddress);
-    printf("  ExitHookAddress: %p\n", paramCallingConvention->ExitHookAddress);
+    printf("  ExitHookAddress: %p\n", paramCallingConvention->ExitHookAddress);*/
 
     return paramCallingConvention;
 }

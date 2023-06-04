@@ -7,3 +7,5 @@
 [ ] Missing parameter reordering
 [ ] Missing IR for mov reg, [reg+reg]
 [ ] Missing IR for lea reg, [reg+reg]
+[ ] Handle cases where params are not retrieved in the first basic Blocks
+[ ] Handle SIMD instruction like addss which can reference stack

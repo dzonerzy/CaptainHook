@@ -785,7 +785,8 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
         }
         break;
     case TEMU_ANAL_RETURN:
-        for (size_t i = logger.TraceCount - 1; i > 0; i--)
+
+        for (size_t i = logger.TraceCount - 1; i >= 0; i--)
         {
             if (logger.TraceLog[i].Trace.Lt == TRACE_REG && (logger.TraceLog[i].Trace.LValue.RegValue.RegValue != FD_REG_SP && logger.TraceLog[i].Trace.LValue.RegValue.RegValue != FD_REG_BP))
             {
