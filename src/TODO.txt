@@ -1,0 +1,9 @@
+[x] Call convention detection
+[x] Function detection  
+[x] Function arguments detection
+[x] Function return type detection
+[x] Function Control Flow Graph
+[x] Function Basic Blocks
+[ ] Missing parameter reordering
+[ ] Missing IR for mov reg, [reg+reg]
+[ ] Missing IR for lea reg, [reg+reg]
