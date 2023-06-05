@@ -3,7 +3,6 @@
 #include <cpthook_anal.h>
 #include <cpthook_ir.h>
 #include <cpthook_temu.h>
-#include <fadec-enc.h>
 
 #define HOOKSIZE 6
 

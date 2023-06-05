@@ -1,7 +1,6 @@
 raw_sources = [
   'decode.c',
   'format.c',
-  'encode.c',
 ]
 
 fadec_sources = []

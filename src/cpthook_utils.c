@@ -1,5 +1,4 @@
 #include <cpthook.h>
-#include <fadec-enc.h>
 
 uintptr_t cpthk_find_pattern(uint8_t *pBuffer, DWORD dwBufferSize, const char *pPattern)
 {
