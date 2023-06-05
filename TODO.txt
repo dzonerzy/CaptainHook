@@ -8,4 +8,6 @@
 [ ] Missing IR for mov reg, [reg+reg]
 [ ] Missing IR for lea reg, [reg+reg]
 [ ] Handle cases where params are not retrieved in the first basic Blocks
-[ ] Handle SIMD instruction like addss which can reference stack
+[ ] Handle SIMD instruction like addss which can reference stack like addss
+[ ] Handle cases when the trampoline contains conditional jmp (take care of conditional jmp inside the trampoline itself)
+[ ] Make sure jmp table allocation never fail 

@@ -285,33 +285,6 @@ PINST_TRACE_LIST cpthk_get_instr_trace(uint8_t *Buffer, size_t Size, TRACE_POINT
                     valid = false;
                 }
                 break;
-                /*
-                    Those are used only to perform operation not to pass parameters
-
-                case FDI_FLD:
-                case FDI_FLD1:
-                case FDI_FLDCW:
-                case FDI_FLDENV:
-                case FDI_FLDL2E:
-                case FDI_FLDL2T:
-                case FDI_FLDLG2:
-                case FDI_FLDLN2:
-                case FDI_FLDPI:
-                case FDI_FLDZ:
-                    traceEntry.Type = TRACE_TYPE_LOAD;
-                    traceEntry.Instr = instr;
-
-                    break;
-                case FDI_FST:
-                case FDI_FSTCW:
-                case FDI_FSTENV:
-                case FDI_FSTP:
-                case FDI_FSTSW:
-                    traceEntry.Type = TRACE_TYPE_STORE;
-                    traceEntry.Instr = instr;
-
-                    break;
-                */
             case FDI_SUB:
             case FDI_ADD:
                 traceEntry.Type = TRACE_TYPE_MATH;

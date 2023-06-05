@@ -791,7 +791,7 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
             if (logger.TraceLog[i].Trace.Lt == TRACE_REG && (logger.TraceLog[i].Trace.LValue.RegValue.RegValue != FD_REG_SP && logger.TraceLog[i].Trace.LValue.RegValue.RegValue != FD_REG_BP))
             {
                 cc->ReturnRegister = logger.TraceLog[i].Trace.LValue.RegValue.RegValue;
-                cc->ExitHookAddress = logger.TraceLog[i].Trace.Address;
+                cc->ExitHookAddress = logger.TraceLog[i].Trace.Address + FD_SIZE(&logger.TraceLog[i].Trace.Instr);
                 break;
             }
         }
