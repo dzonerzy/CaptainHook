@@ -650,6 +650,7 @@ PINST_TRACE_LIST cpthk_get_trace(PCONTROL_FLOW_GRAPH Cfg, TRACE_POINT point, PIN
     switch (point)
     {
     case TRACE_POINT_CALLER:
+
         xrefs = cpthk_find_xref(Cfg->Address);
 
         if (!xrefs)
@@ -665,8 +666,6 @@ PINST_TRACE_LIST cpthk_get_trace(PCONTROL_FLOW_GRAPH Cfg, TRACE_POINT point, PIN
                 break;
             }
         }
-
-        printf("idx: %d\n", idx);
 
         if (idx == -1)
         {

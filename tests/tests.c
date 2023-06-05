@@ -77,6 +77,11 @@ unsigned int __stdcall test4i(int f1, int f2, int f3, int f4)
     return i;
 }
 
+__fastcall void entry(CPTHOOK_CTX ctx)
+{
+    LOG_INFO("Inside HookEntry", NULL);
+}
+
 int main(int argc, char **argv)
 {
     if (!cpthk_init())
@@ -85,9 +90,9 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (!cpthk_hook((uintptr_t)test4f, NULL, NULL))
+    if (!cpthk_hook((uintptr_t)test4i, entry, NULL))
     {
-        LOG_ERROR("Failed to hook test4f", NULL);
+        LOG_ERROR("Failed to hook test4i", NULL);
         return 1;
     }
 

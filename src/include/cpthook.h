@@ -6,7 +6,7 @@
 #include <cpthook_temu.h>
 #include <fadec-enc.h>
 
-#define HOOKSIZE 5
+#define HOOKSIZE 14
 
 #pragma pack(push, 1)
 typedef struct _CPTHOOK_CTX
@@ -48,8 +48,13 @@ typedef struct _CPTHOOK_CTX
             unsigned long edi;
         } x32regs;
     };
+
+    uintptr_t EntryHook;
+    uintptr_t ExitHook;
 } CPTHOOK_CTX, *PCPTHOOK_CTX;
 #pragma pack(pop)
+
+typedef void(__fastcall *HOOKFNC)(CPTHOOK_CTX Context);
 
 typedef struct _HOOK_ENTRY
 {
@@ -71,8 +76,6 @@ typedef struct _HOOK_LIST
 
 extern PHOOK_LIST HookList;
 extern bool HookListInitialized;
-
-typedef void(__stdcall *HOOKFNC)(CPTHOOK_CTX Context);
 
 bool cpthk_init(void);
 void cpthk_deinit(void);

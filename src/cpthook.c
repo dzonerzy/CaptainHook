@@ -42,7 +42,7 @@ void cpthk_set_arg(CPTHOOK_CTX Context, uint32_t ArgIndex, uintptr_t Value)
 {
 }
 
-bool cpthk_hook_add_internal(uintptr_t HookContext, PCALLING_CONVENTION CallingConvention)
+bool cpthk_hook_add_internal(uintptr_t HookContext, PCALLING_CONVENTION CallingConvention, HOOKFNC HookEntry, HOOKFNC HookExit)
 {
     if (HookList->Size > HookList->Count)
     {
@@ -54,15 +54,29 @@ bool cpthk_hook_add_internal(uintptr_t HookContext, PCALLING_CONVENTION CallingC
             return false;
         }
     }
+    else
+    {
+        HookList->Size = 10;
+        HookList->Entries = (PHOOK_ENTRY)malloc(HookList->Size * sizeof(HOOK_ENTRY));
+        if (!HookList->Entries)
+        {
+            HookList->Size = 0;
+            return false;
+        }
+    }
 
-    PHOOK_ENTRY HookEntry = &HookList->Entries[HookList->Count++];
+    PHOOK_ENTRY Entry = &HookList->Entries[HookList->Count++];
 
-    HookEntry->Enabled = true;
-    HookEntry->HookContext = (PCPTHOOK_CTX)HookContext;
+    Entry->Enabled = true;
+    Entry->HookContext = (PCPTHOOK_CTX)HookContext;
 
     // create the context
     CPTHOOK_CTX Context;
+    memset(&Context, 0, sizeof(CPTHOOK_CTX));
+
     Context.CallingConvention = CallingConvention;
+    Context.EntryHook = (uintptr_t)HookEntry;
+    Context.ExitHook = (uintptr_t)HookExit;
 
     printf("Hooking function at %p\n", CallingConvention->EntryHookAddress);
     printf("HookContext at %p\n", HookContext);
@@ -77,16 +91,15 @@ bool cpthk_hook_add_internal(uintptr_t HookContext, PCALLING_CONVENTION CallingC
     }
 
     unsigned char originalEntryBytes[HOOKSIZE + 15];
-    size_t entryReplacedBytes = cpthk_write_jmp(CallingConvention->EntryHookAddress, HookContext + sizeof(CPTHOOK_CTX), (unsigned char *)&originalEntryBytes);
+    size_t entryReplacedBytesSize = cpthk_write_jmp(CallingConvention->EntryHookAddress, HookContext + sizeof(CPTHOOK_CTX), (unsigned char *)&originalEntryBytes);
 
-    if (entryReplacedBytes == 0)
+    if (entryReplacedBytesSize == 0)
     {
-        free(HookEntry);
         return false;
     }
 
-    HookEntry->OriginalEntrySize = entryReplacedBytes;
-    memcpy(HookEntry->OriginalEntryBytes, originalEntryBytes, entryReplacedBytes);
+    Entry->OriginalEntrySize = entryReplacedBytesSize;
+    memcpy(Entry->OriginalEntryBytes, originalEntryBytes, entryReplacedBytesSize);
 
     return true;
 }
@@ -124,13 +137,13 @@ bool cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC ExitHook)
         return false;
     }
 
-    if (!cpthk_hook_add_internal(Hook, CallingConvention))
+    // Add the actual hook here
+    if (!cpthk_hook_add_internal(Hook, CallingConvention, EntryHook, ExitHook))
     {
         VirtualFree((LPVOID)Hook, 0, MEM_RELEASE);
         return false;
     }
-
-    // Add the actual hook here
+    // End of hook
 
     if (!cpthk_protect_function(ControlFlowGraph, PAGE_EXECUTE_READ))
     {

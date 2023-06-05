@@ -90,77 +90,112 @@ bool cpthk_operate_threads(THREAD_OP Operation)
     return true;
 }
 
-void cpthk_stub64(void)
+void __declspec(naked) cpthk_stub32(void)
 {
-    /*
-    typedef struct _CALLING_CONVENTION
-    {
-        uintptr_t EntryHookAddress;
-        uintptr_t ExitHookAddress;
-        ARGUMENT Arguments[16];
-        size_t ArgumentsCount;
-        FdReg ReturnRegister;
-    } CALLING_CONVENTION, *PCALLING_CONVENTION;
+}
 
-    #pragma pack(push, 1)
-    typedef struct _CPTHOOK_CTX
-    {
-        PCALLING_CONVENTION CallingConvention;
-        union
-        {
-            unsigned char _rctx[128];
+void __declspec(naked) cpthk_stub32_end(void)
+{
+}
 
-            struct
-            {
-                unsigned long long rax;
-                unsigned long long rcx;
-                unsigned long long rdx;
-                unsigned long long rbx;
-                unsigned long long rsp;
-                unsigned long long rbp;
-                unsigned long long rsi;
-                unsigned long long rdi;
-                unsigned long long r8;
-                unsigned long long r9;
-                unsigned long long r10;
-                unsigned long long r11;
-                unsigned long long r12;
-                unsigned long long r13;
-                unsigned long long r14;
-                unsigned long long r15;
-            } x64regs;
-
-            struct
-            {
-                unsigned long eax;
-                unsigned long ecx;
-                unsigned long edx;
-                unsigned long ebx;
-                unsigned long esp;
-                unsigned long ebp;
-                unsigned long esi;
-                unsigned long edi;
-            } x32regs;
-        };
-    } CPTHOOK_CTX, *PCPTHOOK_CTX;
-    #pragma pack(pop)
-    */
+void __declspec(naked) cpthk_stub64(void)
+{
     __asm(
-
         ".intel_syntax noprefix\n"
         // save rax and rbx since we will use them
         "push rax\n"
+        "push rcx\n"
         "push rbx\n"
+        "push rdx\n"
         "call 1f\n"
         "1:\n"
         // save return address
         "pop rax\n"
         // make rax point to CPTHOOK_CTX and accoutn for the pushed rax and rbx and call 1f
-        "lea rax, [rax + 0x88 + 0x10]\n"
-
+        "lea rax, [rax - 0xa1]\n"
+        // now rax points to CPTHOOK_CTX
+        // save the full context
+        // keep in mind that old rax now is in [rsp + 0x18]
+        "add rax, 0x08\n"
+        "mov rbx, [rsp+0x18]\n"
+        "mov [rax], rbx\n" // save rax
+        "mov rbx, [rsp + 0x010]\n"
+        "mov [rax + 0x08], rbx\n" // save rcx
+        "mov rbx, [rsp + 0x08]\n"
+        "mov [rax + 0x10], rbx\n" // save rdx
+        "mov rbx, [rsp]\n"
+        "mov [rax + 0x18], rbx\n" // save rbx
+        "mov rbx, rsp\n"
+        "add rbx, 0x20\n"
+        "mov [rax + 0x20], rbx\n" // save rsp
+        "mov [rax + 0x28], rbp\n" // save rbp
+        "mov [rax + 0x30], rsi\n" // save rsi
+        "mov [rax + 0x38], rdi\n" // save rdi
+        "mov [rax + 0x40], r8\n"  // save r8
+        "mov [rax + 0x48], r9\n"  // save r9
+        "mov [rax + 0x50], r10\n" // save r10
+        "mov [rax + 0x58], r11\n" // save r11
+        "mov [rax + 0x60], r12\n" // save r12
+        "mov [rax + 0x68], r13\n" // save r13
+        "mov [rax + 0x70], r14\n" // save r14
+        "mov [rax + 0x78], r15\n" // save r15
+        // we saved the full context
+        // now we can freely pop rax, rbx, rcx and rdx
+        "pop rdx\n"               // restore rdx
+        "pop rdx\n"               // restore rbx
+        "pop rdx\n"               // restore rcx
+        "pop rdx\n"               // restore rax
+        "lea rbx, [rax + 0x80]\n" // rbx points to HookEntry
+        "lea rcx, [rax - 0x8]\n"
+        "call [rbx]\n" // call the hook entry
+        // now restore registers based on cpthk_ctx
+        "call 2f\n"
+        "2:\n"
+        "pop rax\n"
+        "lea rax, [rax - 0x11c]\n" // rax now points to CPTHOOK_CTX
+        "add rax, 0x08\n"          // rax now points to the saved context
+        "mov rbx, [rax]\n"         // save rax
+        "push rbx\n"
+        "mov rbx, [rax + 0x08]\n" // save rcx
+        "push rbx\n"
+        "mov rbx, [rax + 0x10]\n" // save rdx
+        "push rbx\n"
+        "mov rbx, [rax + 0x18]\n" // save rbx
+        "push rbx\n"
+        "mov rbx, rsp\n"
+        "add rbx, 0x20\n"
+        "mov rsp, rbx\n"          // restore rsp
+        "mov rbp, [rax + 0x28]\n" // restore rbp
+        "mov rsi, [rax + 0x30]\n" // restore rsi
+        "mov rdi, [rax + 0x38]\n" // restore rdi
+        "mov r8, [rax + 0x40]\n"  // restore r8
+        "mov r9, [rax + 0x48]\n"  // restore r9
+        "mov r10, [rax + 0x50]\n" // restore r10
+        "mov r11, [rax + 0x58]\n" // restore r11
+        "mov r12, [rax + 0x60]\n" // restore r12
+        "mov r13, [rax + 0x68]\n" // restore r13
+        "mov r14, [rax + 0x70]\n" // restore r14
+        "mov r15, [rax + 0x78]\n" // restore r15
+        // now restore rax, rbx, rcx and rdx from the stack
+        "mov rbx, [rsp - 0x8]\n"  // restore rax
+        "mov rdx, [rsp - 0x10]\n" // restore rbx
+        "mov rcx, [rsp - 0x18]\n" // restore rcx
+        "mov rax, [rsp - 0x20]\n" // restore rdx
+        "jmp [rip]\n"             // jump to the original function
+        // the original function will be patched to jump to the trampoline
+        // the trampoline will jump to the hook entry point
+        "nop\n"
+        "nop\n"
+        "nop\n"
+        "nop\n"
+        "nop\n"
+        "nop\n"
+        "nop\n"
+        "nop\n"
         "");
 }
-void cpthk_stub64_end(void) {}
+
+void __declspec(naked) cpthk_stub64_end(void) {}
 
 bool cpthk_populate_hook_context(uintptr_t Address, int mode)
 {
@@ -170,6 +205,8 @@ bool cpthk_populate_hook_context(uintptr_t Address, int mode)
     switch (mode)
     {
     case 32:
+        // copy the stub
+        memcpy((void *)(Address + sizeof(CPTHOOK_CTX)), (void *)cpthk_stub32, (uintptr_t)cpthk_stub32_end - (uintptr_t)cpthk_stub32);
         break;
     case 64:
         // copy the stub
@@ -202,6 +239,7 @@ size_t cpthk_write_jmp(uintptr_t Address, uintptr_t Destination, unsigned char *
     // so we can just write the jmp
 
     int size = 0;
+    int limitSize = FD_MODE == 32 ? 5 : 14;
     uintptr_t startAddress = Address;
     do
     {
@@ -217,14 +255,21 @@ size_t cpthk_write_jmp(uintptr_t Address, uintptr_t Destination, unsigned char *
         {
             return -1;
         }
-    } while (size < 5);
+    } while (size < limitSize);
 
-    // write jmp at Address
-    unsigned char jmp[5] = {0xE9, 0x00, 0x00, 0x00, 0x00};
-    *(uintptr_t *)(jmp + 1) = Destination - Address - 5;
-    memcpy((void *)Address, jmp, 5);
-    // add nop padding
-    memset((void *)(Address + 5), 0x90, size - 5);
+    switch (FD_MODE)
+    {
+    case 32:
+        JMP_RELATIVE32(Address, Destination);
+        memset((void *)(Address + 5), 0x90, size - 5);
+        break;
+    case 64:
+        JMP_ABSOLUTE64(Address, Destination);
+        memset((void *)(Address + 14), 0x90, size - 14);
+        break;
+    default:
+        return -1;
+    }
 
     return size;
 }
