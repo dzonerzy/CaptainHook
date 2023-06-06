@@ -76,7 +76,7 @@ extern PHOOK_LIST HookList;
 extern bool HookListInitialized;
 
 bool cpthk_init(void);
-void cpthk_deinit(void);
+void cpthk_uninit(void);
 bool cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC ExitHook);
 bool cpthk_unhook(uintptr_t FunctionAddress);
 

@@ -25,6 +25,9 @@ if cc.get_argument_syntax() != 'msvc'
   add_project_arguments('-Wno-overlength-strings', language: 'c')
   add_project_arguments('-Wno-format', language: 'c')
   add_project_arguments('-fno-stack-protector', language: 'c')
+  add_project_arguments('-fsanitize=address', language: 'c')
+  # add link arguments
+  add_project_link_arguments('-fsanitize=address', language: 'c')
 else
   add_project_arguments('/wd4100', language: 'c')
   add_project_arguments('/wd4244', language: 'c')

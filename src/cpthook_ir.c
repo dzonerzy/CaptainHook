@@ -653,7 +653,7 @@ PINST_TRACE_LIST cpthk_get_trace(PCONTROL_FLOW_GRAPH Cfg, TRACE_POINT point, PIN
         }
 
         StartAddress = cpthk_get_n_prev_instrs(textAddr, 40, xrefs->Entries[idx].Address, 0, &bufferSize);
-
+        free(xrefs);
         list = cpthk_get_instr_trace((uint8_t *)StartAddress, bufferSize, point);
 
         return list;
@@ -756,8 +756,8 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
     cpthk_free_trace_list(list);
     cpthk_free_trace_list(list2);
     cpthk_free_trace_list(list3);
-    cpthk_free_hashmap(cfg->Map);
-    free(cfg);
+    // cpthk_free_hashmap(cfg->Map);
+    // free(cfg);
     free(returnCallingConvention);
 
     /*printf("Calling convention:\n");

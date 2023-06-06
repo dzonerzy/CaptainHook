@@ -70,15 +70,24 @@ bool cpthk_init(void)
     return true;
 }
 
-void cpthk_deinit(void)
+void cpthk_uninit(void)
 {
     if (!HookList)
         return;
 
-    if (HookList->Entries)
-        free(HookList->Entries);
+    for (unsigned long i = 0; i < HookList->Count; i++)
+    {
+        PHOOK_ENTRY entry = &HookList->Entries[i];
+        if (entry->HookContext)
+        {
+            free((void *)entry->HookContext->HookTrampolineEntry);
+            free((void *)entry->HookContext->HookTrampolineExit);
+            free((void *)entry->HookContext);
+            entry->HookContext = NULL;
+        }
+    }
 
-    free(HookList);
+    free((void *)HookList);
     HookList = NULL;
     HookListInitialized = false;
 }
@@ -373,6 +382,9 @@ bool cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC ExitHook)
 
     if (!cpthk_operate_threads(THREAD_OP_RESUME))
         return false;
+
+    // free the CFG
+    cpthk_free_cfg(ControlFlowGraph);
 
     return true;
 }

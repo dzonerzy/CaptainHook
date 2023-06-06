@@ -105,5 +105,7 @@ int main(int argc, char **argv)
     system("pause");
 
     printf("res = %d\n", test4i(1, 2, 3, 4));
+
+    cpthk_uninit();
     return 0;
 }
