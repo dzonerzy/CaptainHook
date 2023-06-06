@@ -18,46 +18,54 @@ bool cpthk_init(void)
     HookList->Entries = (PHOOK_ENTRY)malloc(HookList->Size * sizeof(HOOK_ENTRY));
     HookListInitialized = true;
 
-    MEMORY_BASIC_INFORMATION mbi;
-
-    if (VirtualQuery(GetModuleHandleA(NULL), &mbi, sizeof(MEMORY_BASIC_INFORMATION)) == 0)
+    if (FD_MODE == 64)
     {
-        return false;
+
+        MEMORY_BASIC_INFORMATION mbi;
+
+        if (VirtualQuery(GetModuleHandleA(NULL), &mbi, sizeof(MEMORY_BASIC_INFORMATION)) == 0)
+        {
+            return false;
+        }
+
+        // get page size
+        uintptr_t pageSize = 0x1000;
+        uintptr_t moduleBase = (uintptr_t)mbi.AllocationBase;
+        uintptr_t moduleEnd = moduleBase + mbi.RegionSize;
+        uintptr_t tableEntry = moduleEnd - 0x5000;
+        // align tableEntry to next PAGE_SIZE
+        tableEntry = (tableEntry + pageSize - 1) & ~(pageSize - 1);
+
+        if (VirtualQuery((void *)tableEntry, &mbi, sizeof(MEMORY_BASIC_INFORMATION)) == 0)
+        {
+            return false;
+        }
+
+        // check if the table is free
+        if (mbi.State != MEM_FREE)
+        {
+            return false;
+        }
+
+        // allocate the table
+        uintptr_t TableAddr = (uintptr_t)VirtualAlloc((void *)tableEntry, 0x2000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        if (!TableAddr)
+        {
+            return false;
+        }
+
+        // initialize the table
+        memset((void *)TableAddr, 0, 0x2000);
+
+        // set the table entry
+        JmpTable.TableEntry = (uintptr_t *)TableAddr;
+        JmpTable.TableCapacity = 0x2000 / sizeof(uintptr_t);
+        JmpTable.TableCount = 0;
     }
-
-    // get page size
-    uintptr_t pageSize = 0x1000;
-    uintptr_t moduleBase = (uintptr_t)mbi.AllocationBase;
-    uintptr_t moduleEnd = moduleBase + mbi.RegionSize;
-    uintptr_t tableEntry = moduleEnd - 0x5000;
-    // align tableEntry to next PAGE_SIZE
-    tableEntry = (tableEntry + pageSize - 1) & ~(pageSize - 1);
-
-    if (VirtualQuery((void *)tableEntry, &mbi, sizeof(MEMORY_BASIC_INFORMATION)) == 0)
+    else
     {
-        return false;
+        // on 32 bit we don't need a jmp table since we can use the jmp relative to the hook entry
     }
-
-    // check if the table is free
-    if (mbi.State != MEM_FREE)
-    {
-        return false;
-    }
-
-    // allocate the table
-    uintptr_t TableAddr = (uintptr_t)VirtualAlloc((void *)tableEntry, 0x2000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    if (!TableAddr)
-    {
-        return false;
-    }
-
-    // initialize the table
-    memset((void *)TableAddr, 0, 0x2000);
-
-    // set the table entry
-    JmpTable.TableEntry = (uintptr_t *)TableAddr;
-    JmpTable.TableCapacity = 0x2000 / sizeof(uintptr_t);
-    JmpTable.TableCount = 0;
 
     return true;
 }
@@ -90,12 +98,6 @@ void cpthk_set_return(CPTHOOK_CTX Context, uintptr_t Value)
 
 bool cpthk_write_trampoline(uintptr_t TrampolineAddr, uintptr_t OriginalHook, uint8_t *originalBytes, size_t originalBytesSize)
 {
-
-    DWORD oldProtect = 0;
-    if (!VirtualProtect((void *)TrampolineAddr, originalBytesSize + (15 * 6), PAGE_EXECUTE_READWRITE, &oldProtect))
-    {
-        return false;
-    }
 
     // copy the original bytes to the trampoline take care of possible jumps which now are not valid anymore
     size_t trampolineSize = 0;
@@ -166,7 +168,7 @@ void cpthk_restore_jmps(uintptr_t Address, uint8_t *Buffer, size_t OldBufSize)
     memcpy((void *)Address, Buffer, OldBufSize);
 }
 
-bool cpthk_hook_add_internal(uintptr_t HookContext, PCALLING_CONVENTION CallingConvention, HOOKFNC HookEntry, HOOKFNC HookExit)
+bool cpthk_hook_add_internal(uintptr_t FunctionAddress, uintptr_t HookContext, PCALLING_CONVENTION CallingConvention, HOOKFNC HookEntry, HOOKFNC HookExit)
 {
     if (HookList->Size > HookList->Count)
     {
@@ -181,6 +183,7 @@ bool cpthk_hook_add_internal(uintptr_t HookContext, PCALLING_CONVENTION CallingC
 
     PHOOK_ENTRY Entry = &HookList->Entries[HookList->Count++];
 
+    Entry->FunctionAddress = FunctionAddress;
     Entry->Enabled = true;
     Entry->HookContext = (PCPTHOOK_CTX)HookContext;
 
@@ -216,7 +219,7 @@ bool cpthk_hook_add_internal(uintptr_t HookContext, PCALLING_CONVENTION CallingC
         Entry->HookContext->HookTrampolineEntry = (uintptr_t)malloc(entryReplacedBytesSize + (15 * 6));
         if (!Entry->HookContext->HookTrampolineEntry)
         {
-            cpthk_restore_jmps(CallingConvention->EntryHookAddress, originalEntryBytes, entryReplacedBytesSize);
+            cpthk_restore_jmps(CallingConvention->EntryHookAddress, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
             return false;
         }
         else
@@ -227,7 +230,7 @@ bool cpthk_hook_add_internal(uintptr_t HookContext, PCALLING_CONVENTION CallingC
         // Write the trampoline
         if (!cpthk_write_trampoline(Entry->HookContext->HookTrampolineEntry, CallingConvention->EntryHookAddress, originalEntryBytes, entryReplacedBytesSize))
         {
-            cpthk_restore_jmps(CallingConvention->EntryHookAddress, originalEntryBytes, entryReplacedBytesSize);
+            cpthk_restore_jmps(CallingConvention->EntryHookAddress, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
             free((void *)Entry->HookContext->HookTrampolineEntry);
             return false;
         }
@@ -236,7 +239,7 @@ bool cpthk_hook_add_internal(uintptr_t HookContext, PCALLING_CONVENTION CallingC
         stubSize = cpthk_populate_hook_context(HookContext, HookContext + sizeof(CPTHOOK_CTX), Entry->HookContext->HookTrampolineEntry, FD_MODE);
         if (stubSize == 0)
         {
-            cpthk_restore_jmps(CallingConvention->EntryHookAddress, originalEntryBytes, entryReplacedBytesSize);
+            cpthk_restore_jmps(CallingConvention->EntryHookAddress, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
             return false;
         }
     }
@@ -261,7 +264,7 @@ bool cpthk_hook_add_internal(uintptr_t HookContext, PCALLING_CONVENTION CallingC
         Entry->HookContext->HookTrampolineExit = (uintptr_t)malloc(exitReplacedBytesSize + (15 * 6));
         if (!Entry->HookContext->HookTrampolineExit)
         {
-            cpthk_restore_jmps(CallingConvention->ExitHookAddress, originalExitBytes, exitReplacedBytesSize);
+            cpthk_restore_jmps(CallingConvention->ExitHookAddress, Entry->OriginalExitBytes, Entry->OriginalExitSize);
             free((void *)Entry->HookContext->HookTrampolineEntry);
             return false;
         }
@@ -273,7 +276,7 @@ bool cpthk_hook_add_internal(uintptr_t HookContext, PCALLING_CONVENTION CallingC
         // Write the trampoline
         if (!cpthk_write_trampoline(Entry->HookContext->HookTrampolineExit, CallingConvention->ExitHookAddress, originalExitBytes, exitReplacedBytesSize))
         {
-            cpthk_restore_jmps(CallingConvention->ExitHookAddress, originalExitBytes, exitReplacedBytesSize);
+            cpthk_restore_jmps(CallingConvention->ExitHookAddress, Entry->OriginalExitBytes, Entry->OriginalExitSize);
             free((void *)Entry->HookContext->HookTrampolineExit);
             return false;
         }
@@ -282,10 +285,34 @@ bool cpthk_hook_add_internal(uintptr_t HookContext, PCALLING_CONVENTION CallingC
         stubSize = cpthk_populate_hook_context(HookContext, HookContext + sizeof(CPTHOOK_CTX) + stubSize, Entry->HookContext->HookTrampolineExit, FD_MODE);
         if (stubSize == 0)
         {
-            cpthk_restore_jmps(CallingConvention->ExitHookAddress, originalExitBytes, exitReplacedBytesSize);
+            cpthk_restore_jmps(CallingConvention->ExitHookAddress, Entry->OriginalExitBytes, Entry->OriginalExitSize);
             return false;
         }
     }
+
+    if (HookEntry)
+    {
+        DWORD oldProtect = 0;
+        if (!VirtualProtect((void *)Entry->HookContext->HookTrampolineEntry, Entry->OriginalEntrySize, PAGE_EXECUTE_READWRITE, &oldProtect))
+        {
+            return false;
+        }
+    }
+
+    if (HookExit)
+    {
+        DWORD oldProtect = 0;
+        if (!VirtualProtect((void *)Entry->HookContext->HookTrampolineExit, Entry->OriginalExitSize, PAGE_EXECUTE_READWRITE, &oldProtect))
+        {
+            return false;
+        }
+    }
+
+    printf("Function Entry Hooking Address %p\n", CallingConvention->EntryHookAddress);
+    printf("Function Exit Hooking Address %p\n", CallingConvention->ExitHookAddress);
+    printf("EntryTrampoline %p\n", Entry->HookContext->HookTrampolineEntry);
+    printf("ExitTrampoline %p\n", Entry->HookContext->HookTrampolineExit);
+    printf("HookContext start + stub : %p\n", HookContext);
 
     return true;
 }
@@ -331,7 +358,7 @@ bool cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC ExitHook)
     }
 
     // Add the actual hook here
-    if (!cpthk_hook_add_internal(Hook, CallingConvention, EntryHook, ExitHook))
+    if (!cpthk_hook_add_internal(FunctionAddress, Hook, CallingConvention, EntryHook, ExitHook))
     {
         free((void *)Hook);
         return false;

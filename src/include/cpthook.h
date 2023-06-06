@@ -6,6 +6,12 @@
 
 #define HOOKSIZE 6
 
+typedef struct uint128_t
+{
+    unsigned long long lo;
+    unsigned long long hi;
+} uint128_t;
+
 #pragma pack(push, 1)
 typedef struct _CPTHOOK_CTX
 {
@@ -21,13 +27,13 @@ typedef struct _CPTHOOK_CTX
         struct
         {
             unsigned long long regs[16];
-            __uint128_t xmm[16];
+            uint128_t xmm[16];
         } x64;
 
         struct
         {
             unsigned long regs[8];
-            __uint128_t xmm[8];
+            uint128_t xmm[8];
         } x32;
     };
 
@@ -42,6 +48,7 @@ typedef void(__fastcall *HOOKFNC)(CPTHOOK_CTX Context);
 
 typedef struct _HOOK_ENTRY
 {
+    uintptr_t FunctionAddress;
     bool Enabled;
     uint8_t OriginalEntryBytes[HOOKSIZE + 15];
     size_t OriginalEntrySize;

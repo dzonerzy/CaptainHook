@@ -29,6 +29,6 @@ void cpthk_get_text_section(uintptr_t *textSection, size_t *textSize);
 bool cpthk_operate_threads(THREAD_OP Operation);
 bool cpthk_protect_function(PCONTROL_FLOW_GRAPH Cfg, DWORD Protection);
 size_t cpthk_populate_hook_context(uintptr_t HookContext, uintptr_t Address, uintptr_t Trampoline, int mode);
-void cpthk_stub64(void);
-void cpthk_stub64_end(void);
+void cpthk_stub(void);
+void cpthk_stub_end(void);
 size_t cpthk_write_jmp(uintptr_t Address, uintptr_t Destination, unsigned char *saveBuffer);

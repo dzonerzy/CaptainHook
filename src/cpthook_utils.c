@@ -136,15 +136,10 @@ bool cpthk_operate_threads(THREAD_OP Operation)
     return true;
 }
 
-void __declspec(naked) cpthk_stub32(void)
-{
-}
+// check if 32 bit or 64
 
-void __declspec(naked) cpthk_stub32_end(void)
-{
-}
-
-void __declspec(naked) cpthk_stub64(void)
+#if defined(_WIN64)
+void __declspec(naked) cpthk_stub(void)
 {
     __asm(
         ".intel_syntax noprefix\n"
@@ -271,7 +266,67 @@ void __declspec(naked) cpthk_stub64(void)
         "");
 }
 
-void __declspec(naked) cpthk_stub64_end(void) {}
+void __declspec(naked) cpthk_stub_end(void) {}
+#else
+void __declspec(naked) cpthk_stub(void)
+{
+    __asm(
+        ".intel_syntax noprefix\n"
+        // save eax and ebx since we will use them
+        "push eax\n"
+        "push ecx\n"
+        "push ebx\n"
+        "push edx\n"
+        "call 1f\n"
+        "1:\n"
+        // save return address
+        "pop eax\n"
+        // make eax point to CPTHOOK_CTX and accoutn for the pushed eax and ebx and call 1f
+        "lea eax, [eax + 0x1a1b1c1d]\n"
+        // now eax points to CPTHOOK_CTX
+        // save the full context
+        "add eax, 0x04\n"
+        "mov ebx, [esp + 0x10]\n"
+        "mov [eax + 0x00], ebx\n" // eax + 0x00 = CPTHOOK_CTX->eax
+        "mov ebx, [esp + 0x14]\n"
+        "mov [eax + 0x04], ebx\n" // eax + 0x04 = CPTHOOK_CTX->ecx
+        "mov ebx, [esp + 0x18]\n"
+        "mov [eax + 0x08], ebx\n" // eax + 0x08 = CPTHOOK_CTX->edx
+        "mov ebx, [esp + 0x1c]\n"
+        "mov [eax + 0x0c], ebx\n" // eax + 0x0c = CPTHOOK_CTX->ebx
+        "mov ebx, esp\n"
+        "add ebx, 0x10\n"            // ebx = esp + 0x10
+        "mov [eax + 0x10], ebx\n"    // eax + 0x10 = CPTHOOK_CTX->esp
+        "mov [eax + 0x14], ebp\n"    // eax + 0x14 = CPTHOOK_CTX->ebp
+        "mov [eax + 0x18], esi\n"    // eax + 0x18 = CPTHOOK_CTX->esi
+        "mov [eax + 0x1c], edi\n"    // eax + 0x1c = CPTHOOK_CTX->edi
+        "movss [eax + 0x20], xmm0\n" // eax + 0x20 = CPTHOOK_CTX->xmm0
+        "movss [eax + 0x24], xmm1\n" // eax + 0x24 = CPTHOOK_CTX->xmm1
+        "movss [eax + 0x28], xmm2\n" // eax + 0x28 = CPTHOOK_CTX->xmm2
+        "movss [eax + 0x2c], xmm3\n" // eax + 0x2c = CPTHOOK_CTX->xmm3
+        "movss [eax + 0x30], xmm4\n" // eax + 0x30 = CPTHOOK_CTX->xmm4
+        "movss [eax + 0x34], xmm5\n" // eax + 0x34 = CPTHOOK_CTX->xmm5
+        "movss [eax + 0x38], xmm6\n" // eax + 0x38 = CPTHOOK_CTX->xmm6
+        "movss [eax + 0x3c], xmm7\n" // eax + 0x3c = CPTHOOK_CTX->xmm7
+        "pop edx\n"
+        "pop edx\n"
+        "pop edx\n"
+        "pop edx\n"
+        "lea ebx, [eax + 0x2a2b2c2d]\n"
+        "lea ecx, [eax - 0x4]\n"
+        "push ecx\n"   // push CPTHOOK_CTX
+        "call [ebx]\n" // call CPTHOOK_CTX->Callback
+        "nop\n"
+        "nop\n"
+        "nop\n"
+        "nop\n"
+        "");
+}
+
+void __declspec(naked) cpthk_stub_end(void)
+{
+}
+#endif
 
 size_t cpthk_populate_hook_context(uintptr_t HookContext, uintptr_t Address, uintptr_t Trampoline, int mode)
 {
@@ -280,22 +335,36 @@ size_t cpthk_populate_hook_context(uintptr_t HookContext, uintptr_t Address, uin
 
     if (mode == 32)
     {
-        size_t stubSize = (uintptr_t)cpthk_stub32_end - (uintptr_t)cpthk_stub32;
+        size_t stubSize = (uintptr_t)cpthk_stub_end - (uintptr_t)cpthk_stub;
         // copy the stub
-        memcpy((void *)Address, (void *)cpthk_stub32, stubSize);
-        uintptr_t *trampolineAddr = (uintptr_t *)cpthk_find_pattern((uint8_t *)Address, stubSize, "90 90 90 90");
+        memcpy((void *)Address, (void *)cpthk_stub, stubSize);
+
+        /*uintptr_t *trampolineAddr = (uintptr_t *)cpthk_find_pattern((uint8_t *)Address, stubSize, "90 90 90 90");
         if (trampolineAddr)
             *trampolineAddr = Trampoline;
         else
             return 0;
 
+        signed int *firstOffset = (signed int *)cpthk_find_pattern((uint8_t *)Address, stubSize, "1D 1C 1B 1A");
+        signed int *secondOffset = (signed int *)cpthk_find_pattern((uint8_t *)Address, stubSize, "2D 2C 2B 2A");
+
+        if (!firstOffset)
+            return 0;
+
+        if (!secondOffset)
+            return 0;
+
+        *firstOffset = (signed int)(((uintptr_t)firstOffset - HookContext - 4) * -1);
+        *secondOffset = (signed int)(((uintptr_t)secondOffset - HookContext - 4) * -1);
+
+        PCPTHOOK_CTX ctx = (PCPTHOOK_CTX)HookContext;*/
         // TODO: remove this when 32 bit hooking is implemented
-        return 0;
+        return stubSize;
     }
     else if (mode == 64)
     {
-        size_t stubSize = (uintptr_t)cpthk_stub64_end - (uintptr_t)cpthk_stub64;
-        memcpy((void *)Address, (void *)cpthk_stub64, stubSize);
+        size_t stubSize = (uintptr_t)cpthk_stub_end - (uintptr_t)cpthk_stub;
+        memcpy((void *)Address, (void *)cpthk_stub, stubSize);
 
         uintptr_t *trampolineAddr = (uintptr_t *)cpthk_find_pattern((uint8_t *)Address, stubSize, "90 90 90 90 90 90 90 90");
         if (trampolineAddr)
@@ -373,8 +442,8 @@ size_t cpthk_write_jmp(uintptr_t Address, uintptr_t Destination, unsigned char *
     switch (FD_MODE)
     {
     case 32:
-        JmpTable.TableEntry[JmpTable.TableCount] = Destination;
-        JMP_RELATIVE32(Address, &JmpTable.TableEntry[JmpTable.TableCount]);
+        // JmpTable.TableEntry[JmpTable.TableCount] = Destination;
+        JMP_RELATIVE32(Address, Destination);
         memset((void *)(Address + 5), 0x90, size - limitSize);
         JmpTable.TableCount++;
         break;

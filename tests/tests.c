@@ -102,6 +102,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    system("pause");
+
     printf("res = %d\n", test4i(1, 2, 3, 4));
     return 0;
 }
