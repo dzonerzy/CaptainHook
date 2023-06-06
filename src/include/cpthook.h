@@ -44,7 +44,7 @@ typedef struct _CPTHOOK_CTX
 } CPTHOOK_CTX, *PCPTHOOK_CTX;
 #pragma pack(pop)
 
-typedef void(__fastcall *HOOKFNC)(CPTHOOK_CTX Context);
+typedef void(__stdcall *HOOKFNC)(PCPTHOOK_CTX Context);
 
 typedef struct _HOOK_ENTRY
 {

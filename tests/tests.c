@@ -77,15 +77,15 @@ unsigned int __stdcall test4i(int f1, int f2, int f3, int f4)
     return i;
 }
 
-__fastcall void entryhook(CPTHOOK_CTX ctx)
+__stdcall void entryhook(PCPTHOOK_CTX ctx)
 {
     LOG_INFO("Inside HookEntry", NULL);
 }
 
-__fastcall void exithook(CPTHOOK_CTX ctx)
+__stdcall void exithook(PCPTHOOK_CTX ctx)
 {
     LOG_INFO("Inside HookExit", NULL);
-    ctx.x64.regs[FD_REG_AX] = 1337;
+    ctx->x32.regs[0] = 1337;
 }
 
 int main(int argc, char **argv)
@@ -96,7 +96,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (!cpthk_hook((uintptr_t)test4i, NULL, exithook))
+    if (!cpthk_hook((uintptr_t)test4i, entryhook, exithook))
     {
         LOG_ERROR("Failed to hook test4i", NULL);
         return 1;
