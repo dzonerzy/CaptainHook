@@ -6,11 +6,12 @@
 [x] Function Basic Blocks
 [x] Basic Hook functionality for 64 bits (gcc & msvc)
 [x] Basic Hook functionality for 32 bits (gcc & msvc)
-[ ] Missing parameter reordering
+[*] Missing parameter reordering
 [?] Missing IR for mov reg, [reg+reg] / lea reg, [reg+reg] / addss reg, [reg+reg] / subss reg, [reg+reg]
 [x] Handle cases where params are not retrieved in the first basic block
 [x] Handle SIMD instruction like addss which can reference stack like addss
 [x] Handle instruction like add which can reference stack
+[x] Handle cases when a parameter is set in the caller but reset in the callee, this should not be considered as a parameter
 [ ] Handle cases when the trampoline contains conditional jmp (take care of conditional jmp inside the trampoline itself)
 [ ] Make sure jmp table allocation never fail
 [ ] Use only one between stack and mem or maybe use mem only for offset which reference RIP register

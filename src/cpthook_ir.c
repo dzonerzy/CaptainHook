@@ -810,21 +810,26 @@ PINST_TRACE_LIST cpthk_get_instr_trace_from_blocks(PFLOW_GRAPH_NODE Node, TRACE_
         }
         else
         {
-            // we found a return node, so we don't need to go further
-            // TODO: handle cases when there's only 1 basic block which is both start and end
+            // get trace from start node
+            partialList = cpthk_get_instr_trace((uint8_t *)node->Address, node->Size, point);
+
             if (node->Flags & CFG_ISSTART && node->Flags & CFG_ISEND)
             {
-                // get trace from start node
-                partialList = cpthk_get_instr_trace((uint8_t *)node->Address, node->Size, point);
                 if (partialList->Size > 0)
                 {
                     // append partialList to finalList
                     cpthk_append_trace_list(partialList, finalList);
                 }
-
-                cpthk_free_trace_list(partialList);
-                partialList = NULL;
             }
+            else if (partialList->Size > finalList->Size)
+            {
+                // the ending block is greater than what we parsed so far
+                // lets' add it since could contains useful information
+                cpthk_append_trace_list(partialList, finalList);
+            }
+
+            cpthk_free_trace_list(partialList);
+            partialList = NULL;
         }
 
     } while (!cpthk_ir_is_stack_empty(stack));
@@ -876,9 +881,8 @@ PINST_TRACE_LIST cpthk_get_trace(PCONTROL_FLOW_GRAPH Cfg, TRACE_POINT point, PIN
 
         StartAddress = cpthk_get_n_prev_instrs(textAddr, 40, xrefs->Entries[idx].Address, 0, &bufferSize, true);
         free(xrefs);
-        list = cpthk_get_instr_trace((uint8_t *)StartAddress, bufferSize, point);
 
-        return list;
+        return cpthk_get_instr_trace((uint8_t *)StartAddress, bufferSize, point);
     case TRACE_POINT_CALLEE:
         return cpthk_get_instr_trace_from_blocks(Cfg->Head, point);
     case TRACE_POINT_RETURN:
@@ -915,6 +919,8 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
     {
         return NULL;
     }
+
+    printf("---------------------------------------------\n");
 
     cpthk_emu_traces(list, &cpu, TEMU_PRIORITIZE_WRITE_FLAG, TEMU_NO_ANAL);
 

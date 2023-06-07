@@ -14,6 +14,7 @@ typedef struct _TEMU_REGISTER
     TEMU_FLAG Flags;
     unsigned short OpCount;
     uintptr_t Value;
+    unsigned long Timestamp;
 } TEMU_REGISTER, *PTEMU_REGISTER;
 
 typedef struct _TEMU_MEM
@@ -21,6 +22,7 @@ typedef struct _TEMU_MEM
     uintptr_t Memory[0x1000];
     TEMU_FLAG Flags[0x1000];
     unsigned short OpCount[0x1000];
+    unsigned long Timestamp[0x1000];
 } TEMU_MEM, *PTEMU_MEM;
 
 typedef struct _TEMU_CPU_CONTEXT
@@ -58,6 +60,7 @@ typedef struct _TRACE_LOG
     unsigned int Index;
     TRACE_POSITION Position;
     INST_TRACE Trace;
+    unsigned long Timestamp;
 } TRACE_LOG, *PTRACE_LOG;
 
 typedef struct _TEMU_TRACE_LOGGER
@@ -66,6 +69,8 @@ typedef struct _TEMU_TRACE_LOGGER
     size_t TraceCount;
     TRACE_LOG TraceLog[0x1000];
 } TEMU_TRACE_LOGGER, *PTEMU_TRACE_LOGGER;
+
+extern unsigned long BaseTimestamp;
 
 PCALLING_CONVENTION
 cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORITIZE_FLAGS Flags, TEMU_ANAL_FLAGS AnalFlags);

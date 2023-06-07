@@ -48,16 +48,16 @@ unsigned int factorial(int n)
 
 unsigned int __stdcall test4f(float f1, float f2, float f3, float f4)
 {
-    int i = f1;
-    if (i < f2 + f3)
+    float res = 0.0f;
+    if (f3 < 6.0)
     {
-        i += f2 + f3;
+        res += f2 + f3;
     }
     else
     {
-        i += f4;
+        res += f4 + f1;
     }
-    return i;
+    return res;
 }
 
 unsigned int __stdcall test4i(int f1, int f2, int f3, int f4)
@@ -82,7 +82,6 @@ void __stdcall entryhook(PCPTHOOK_CTX ctx)
 void __stdcall exithook(PCPTHOOK_CTX ctx)
 {
     LOG_INFO("Inside HookExit", NULL);
-    ctx->x64.regs[0] = 1337;
 }
 
 int main(int argc, char **argv)
@@ -95,7 +94,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    CPTHK_STATUS status = cpthk_hook((uintptr_t)test4i, entryhook, exithook);
+    CPTHK_STATUS status = cpthk_hook((uintptr_t)test4f, entryhook, exithook);
 
     if (status != CPTHK_OK)
     {
@@ -105,15 +104,15 @@ int main(int argc, char **argv)
 
     system("pause");
 
-    printf("res = %d\n", test4i(1, 2, 3, 4));
+    printf("res = %d\n", test4f(1.1, 2.2, 3.3, 4.4));
 
-    if (cpthk_unhook((uintptr_t)test4i) != CPTHK_OK)
+    if (cpthk_unhook((uintptr_t)test4f) != CPTHK_OK)
     {
         LOG_ERROR("Failed to unhook test4i", NULL);
         return 1;
     }
 
-    printf("res = %d\n", test4i(1, 2, 3, 4));
+    printf("res = %d\n", test4f(1.1, 2.2, 3.3, 4.4));
 
     cpthk_uninit();
     return 0;

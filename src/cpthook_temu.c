@@ -1,5 +1,7 @@
 #include <cpthook.h>
 
+unsigned long BaseTimestamp = 0;
+
 static char *cpthk_gpr[] = {
     "rax",
     "rcx",
@@ -85,14 +87,17 @@ void cpthk_emu_reset_regs(PTEMU_CPU_CONTEXT Cpu)
             Cpu->GeneralRegisters[i].Value = 2048;
         Cpu->GeneralRegisters[i].Flags = FLAG_NONE;
         Cpu->GeneralRegisters[i].OpCount = 0;
+        Cpu->GeneralRegisters[i].Timestamp = 0;
 
         Cpu->XMMRegisters[i].Value = 2048;
         Cpu->XMMRegisters[i].Flags = FLAG_NONE;
         Cpu->XMMRegisters[i].OpCount = 0;
+        Cpu->XMMRegisters[i].Timestamp = 0;
 
         Cpu->FPURegisters[i].Value = 2048;
         Cpu->FPURegisters[i].Flags = FLAG_NONE;
         Cpu->FPURegisters[i].OpCount = 0;
+        Cpu->FPURegisters[i].Timestamp = 0;
     }
 
     // initialize the stack
@@ -102,6 +107,10 @@ void cpthk_emu_reset_regs(PTEMU_CPU_CONTEXT Cpu)
         Cpu->Stack.Flags[i] = FLAG_NONE;
         Cpu->Mem.Memory[i] = 2048;
         Cpu->Mem.Flags[i] = FLAG_NONE;
+        Cpu->Stack.OpCount[i] = 0;
+        Cpu->Stack.Timestamp[i] = 0;
+        Cpu->Mem.OpCount[i] = 0;
+        Cpu->Mem.Timestamp[i] = 0;
     }
 }
 
@@ -113,21 +122,36 @@ void cpthk_mov_reg_reg(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORITIZE
     if (trace->LValue.RegValue.gpr)
     {
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         dst = &Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Value;
     }
     else if (trace->LValue.RegValue.vec)
     {
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         dst = &Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Value;
     }
     else if (trace->LValue.RegValue.fpu)
     {
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         Cpu->FPURegisters[trace->LValue.RegValue.RegValue].OpCount++;
         dst = &Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Value;
     }
@@ -162,21 +186,36 @@ void cpthk_mov_reg_imm(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORITIZE
     if (trace->LValue.RegValue.gpr)
     {
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         dst = &Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Value;
     }
     else if (trace->LValue.RegValue.vec)
     {
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         dst = &Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Value;
     }
     else if (trace->LValue.RegValue.fpu)
     {
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         Cpu->FPURegisters[trace->LValue.RegValue.RegValue].OpCount++;
         dst = &Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Value;
     }
@@ -191,21 +230,36 @@ void cpthk_mov_reg_offset(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORIT
     if (trace->LValue.RegValue.gpr)
     {
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         dst = &Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Value;
     }
     else if (trace->LValue.RegValue.vec)
     {
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         dst = &Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Value;
     }
     else if (trace->LValue.RegValue.fpu)
     {
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         Cpu->FPURegisters[trace->LValue.RegValue.RegValue].OpCount++;
         dst = &Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Value;
     }
@@ -240,14 +294,24 @@ void cpthk_mov_offset_reg(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORIT
         {
             dst = &Cpu->Stack.Memory[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset];
             if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+            {
                 Cpu->Stack.Flags[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset] |= FLAG_WRITE;
+                Cpu->Stack.Timestamp[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset] = BaseTimestamp++ + 0x1000;
+            }
+            if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->Stack.Flags[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset] & FLAG_WRITE)
+                Cpu->Stack.Flags[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset] &= ~FLAG_WRITE;
             Cpu->Stack.OpCount[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset]++;
         }
         else
         {
             dst = &Cpu->Mem.Memory[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset];
             if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+            {
                 Cpu->Mem.Flags[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset] |= FLAG_WRITE;
+                Cpu->Mem.Timestamp[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset] = BaseTimestamp++ + 0x1000;
+            }
+            if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->Mem.Flags[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset] & FLAG_WRITE)
+                Cpu->Mem.Flags[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset] &= ~FLAG_WRITE;
             Cpu->Mem.OpCount[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset]++;
         }
     }
@@ -287,14 +351,24 @@ void cpthk_mov_offset_imm(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORIT
         {
             dst = &Cpu->Stack.Memory[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset];
             if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+            {
                 Cpu->Stack.Flags[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset] |= FLAG_WRITE;
+                Cpu->Stack.Timestamp[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset] = BaseTimestamp++ + 0x1000;
+            }
+            if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->Stack.Flags[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset] & FLAG_WRITE)
+                Cpu->Stack.Flags[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset] &= ~FLAG_WRITE;
             Cpu->Stack.OpCount[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset]++;
         }
         else
         {
             dst = &Cpu->Mem.Memory[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset];
             if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+            {
                 Cpu->Mem.Flags[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset] |= FLAG_WRITE;
+                Cpu->Mem.Timestamp[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset] = BaseTimestamp++ + 0x1000;
+            }
+            if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->Mem.Flags[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset] & FLAG_WRITE)
+                Cpu->Mem.Flags[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset] &= ~FLAG_WRITE;
             Cpu->Mem.OpCount[Cpu->GeneralRegisters[trace->LValue.OffsetValue.Reg].Value + trace->LValue.OffsetValue.Offset]++;
         }
     }
@@ -310,21 +384,36 @@ void cpthk_lea_reg_offset(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORIT
     if (trace->LValue.RegValue.gpr)
     {
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         dst = &Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Value;
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].OpCount++;
     }
     else if (trace->LValue.RegValue.vec)
     {
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         dst = &Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Value;
         Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].OpCount++;
     }
     else if (trace->LValue.RegValue.fpu)
     {
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         dst = &Cpu->FPURegisters[trace->LValue.RegValue.RegValue].Value;
         Cpu->FPURegisters[trace->LValue.RegValue.RegValue].OpCount++;
     }
@@ -348,7 +437,12 @@ void cpthk_add_reg_reg(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORITIZE
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Value += Cpu->GeneralRegisters[trace->RValue.RegValue.RegValue].Value;
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         if (Flags & TEMU_PRIORITIZE_READ_FLAG)
             Cpu->GeneralRegisters[trace->RValue.RegValue.RegValue].Flags |= FLAG_READ;
     }
@@ -357,7 +451,12 @@ void cpthk_add_reg_reg(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORITIZE
         Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Value += Cpu->XMMRegisters[trace->RValue.RegValue.RegValue].Value;
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         if (Flags & TEMU_PRIORITIZE_READ_FLAG)
             Cpu->XMMRegisters[trace->RValue.RegValue.RegValue].Flags |= FLAG_READ;
     }
@@ -371,14 +470,24 @@ void cpthk_add_reg_imm(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORITIZE
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Value += trace->RValue.ImmediateValue;
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
     }
     else if (trace->LValue.RegValue.vec)
     {
         Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Value += trace->RValue.ImmediateValue;
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
     }
 }
 
@@ -390,14 +499,24 @@ void cpthk_add_reg_offset(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORIT
     {
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         dst = &Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Value;
     }
     else if (trace->LValue.RegValue.vec)
     {
         Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         dst = &Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Value;
     }
 
@@ -444,11 +563,29 @@ void cpthk_sub_reg_reg(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORITIZE
     {
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Value -= Cpu->GeneralRegisters[trace->RValue.RegValue.RegValue].Value;
+        if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG)
+            Cpu->GeneralRegisters[trace->RValue.RegValue.RegValue].Flags |= FLAG_READ;
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
     }
     else if (trace->LValue.RegValue.vec)
     {
         Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Value -= Cpu->XMMRegisters[trace->RValue.RegValue.RegValue].Value;
+        if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG)
+            Cpu->XMMRegisters[trace->RValue.RegValue.RegValue].Flags |= FLAG_READ;
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
     }
 }
 
@@ -459,11 +596,25 @@ void cpthk_sub_reg_imm(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORITIZE
     {
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Value -= trace->RValue.ImmediateValue;
+        if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
     }
     else if (trace->LValue.RegValue.vec)
     {
         Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Value -= trace->RValue.ImmediateValue;
+        if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
     }
 }
 
@@ -475,14 +626,24 @@ void cpthk_sub_reg_offset(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORIT
     {
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         dst = &Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Value;
     }
     else if (trace->LValue.RegValue.vec)
     {
         Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+        {
             Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Timestamp = BaseTimestamp++;
+        }
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG && Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags & FLAG_WRITE)
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags &= ~FLAG_WRITE;
         dst = &Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Value;
     }
 
@@ -607,6 +768,7 @@ void cpthk_log_param_trace(PTEMU_CPU_CONTEXT Cpu, PTEMU_TRACE_LOGGER Logger, PIN
             {
                 Logger->TraceLog[Logger->TraceCount].Index = i;
                 Logger->TraceLog[Logger->TraceCount].Position = TRACE_POSITION_REG_GPR;
+                Logger->TraceLog[Logger->TraceCount].Timestamp = Cpu->GeneralRegisters[i].Timestamp;
                 memcpy(&Logger->TraceLog[Logger->TraceCount].Trace, Trace, sizeof(INST_TRACE));
                 Logger->TraceCount++;
             }
@@ -642,6 +804,7 @@ void cpthk_log_param_trace(PTEMU_CPU_CONTEXT Cpu, PTEMU_TRACE_LOGGER Logger, PIN
             {
                 Logger->TraceLog[Logger->TraceCount].Index = i;
                 Logger->TraceLog[Logger->TraceCount].Position = TRACE_POSITION_REG_VEC;
+                Logger->TraceLog[Logger->TraceCount].Timestamp = Cpu->XMMRegisters[i].Timestamp;
                 memcpy(&Logger->TraceLog[Logger->TraceCount].Trace, Trace, sizeof(INST_TRACE));
                 Logger->TraceCount++;
             }
@@ -677,6 +840,7 @@ void cpthk_log_param_trace(PTEMU_CPU_CONTEXT Cpu, PTEMU_TRACE_LOGGER Logger, PIN
             {
                 Logger->TraceLog[Logger->TraceCount].Index = i;
                 Logger->TraceLog[Logger->TraceCount].Position = TRACE_POSITION_REG_FPU;
+                Logger->TraceLog[Logger->TraceCount].Timestamp = Cpu->FPURegisters[i].Timestamp;
                 memcpy(&Logger->TraceLog[Logger->TraceCount].Trace, Trace, sizeof(INST_TRACE));
                 Logger->TraceCount++;
             }
@@ -712,6 +876,7 @@ void cpthk_log_param_trace(PTEMU_CPU_CONTEXT Cpu, PTEMU_TRACE_LOGGER Logger, PIN
             {
                 Logger->TraceLog[Logger->TraceCount].Index = i;
                 Logger->TraceLog[Logger->TraceCount].Position = TRACE_POSITION_STACK;
+                Logger->TraceLog[Logger->TraceCount].Timestamp = Cpu->Stack.Timestamp[i];
                 memcpy(&Logger->TraceLog[Logger->TraceCount].Trace, Trace, sizeof(INST_TRACE));
                 Logger->TraceCount++;
             }
@@ -721,6 +886,7 @@ void cpthk_log_param_trace(PTEMU_CPU_CONTEXT Cpu, PTEMU_TRACE_LOGGER Logger, PIN
 
 PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORITIZE_FLAGS Flags, TEMU_ANAL_FLAGS AnalFlags)
 {
+    BaseTimestamp = 0;
     PCALLING_CONVENTION cc = malloc(sizeof(CALLING_CONVENTION));
     memset(cc, 0, sizeof(CALLING_CONVENTION));
 
@@ -891,6 +1057,37 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
         if (logger.TraceCount > 0)
         {
             cc->EntryHookAddress = logger.TraceLog[0].Trace.Address;
+        }
+
+        // reorder the arguments based on logger.TraceLog[i].Timestamp
+        for (size_t i = 0; i < logger.TraceCount; i++)
+        {
+            for (size_t j = 0; j < logger.TraceCount; j++)
+            {
+                if (FD_MODE == 64)
+                {
+                    // from the oldest to the newest
+                    if (logger.TraceLog[i].Timestamp < logger.TraceLog[j].Timestamp)
+                    {
+                        // swap
+                        TRACE_LOG tmp = logger.TraceLog[i];
+                        logger.TraceLog[i] = logger.TraceLog[j];
+                        logger.TraceLog[j] = tmp;
+                    }
+                }
+                else
+                {
+                    // on 32 bit parameters are pushed on the stack in reverse order
+                    // from the newest to the oldest
+                    if (logger.TraceLog[i].Timestamp > logger.TraceLog[j].Timestamp)
+                    {
+                        // swap
+                        TRACE_LOG tmp = logger.TraceLog[i];
+                        logger.TraceLog[i] = logger.TraceLog[j];
+                        logger.TraceLog[j] = tmp;
+                    }
+                }
+            }
         }
 
         for (size_t i = 0; i < logger.TraceCount; i++)
