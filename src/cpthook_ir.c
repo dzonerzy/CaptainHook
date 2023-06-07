@@ -118,8 +118,8 @@ char *cpthk_format_trace(PINST_TRACE trace)
     case TRACE_REG:
         if (trace->Type == TRACE_TYPE_MATH)
         {
-            snprintf(buffer + offset, 128, "$0 %c REG[%u]", FD_TYPE(&trace->Instr) == FDI_ADD ? '+' : FDI_SSE_ADDSS ? '+'
-                                                                                                                    : '-',
+            snprintf(buffer + offset, 128, "$0 %c REG[%u]", FD_TYPE(&trace->Instr) == FDI_ADD ? '+' : FD_TYPE(&trace->Instr) == FDI_SSE_ADDSS ? '+'
+                                                                                                                                              : '-',
                      trace->RValue.RegValue.RegValue);
         }
         else
@@ -130,8 +130,8 @@ char *cpthk_format_trace(PINST_TRACE trace)
     case TRACE_OFFSET:
         if (trace->Type == TRACE_TYPE_MATH)
         {
-            snprintf(buffer + offset, 128, "$0 %c OFF[REG[%d] + %lld]", FD_TYPE(&trace->Instr) == FDI_ADD ? '+' : FDI_SSE_ADDSS ? '+'
-                                                                                                                                : '-',
+            snprintf(buffer + offset, 128, "$0 %c OFF[REG[%d] + %lld]", FD_TYPE(&trace->Instr) == FDI_ADD ? '+' : FD_TYPE(&trace->Instr) == FDI_SSE_ADDSS ? '+'
+                                                                                                                                                          : '-',
                      trace->RValue.OffsetValue.Reg, trace->RValue.OffsetValue.Offset);
         }
         else
@@ -142,8 +142,8 @@ char *cpthk_format_trace(PINST_TRACE trace)
     case TRACE_IMMEDIATE:
         if (trace->Type == TRACE_TYPE_MATH)
         {
-            snprintf(buffer + offset, 128, "$0 %c IMM[%lld]", FD_TYPE(&trace->Instr) == FDI_ADD ? '+' : FDI_SSE_ADDSS ? '+'
-                                                                                                                      : '-',
+            snprintf(buffer + offset, 128, "$0 %c IMM[%lld]", FD_TYPE(&trace->Instr) == FDI_ADD ? '+' : FD_TYPE(&trace->Instr) == FDI_SSE_ADDSS ? '+'
+                                                                                                                                                : '-',
                      trace->RValue.ImmediateValue);
         }
         else
@@ -195,7 +195,7 @@ PINST_TRACE_LIST cpthk_free_trace_list(PINST_TRACE_LIST list)
 {
     if (list)
     {
-        if (list->Entries)
+        if (list->Entries && list->Size > 0)
             free(list->Entries);
 
         free(list);
@@ -211,6 +211,8 @@ PINST_TRACE_LIST cpthk_get_instr_trace(uint8_t *Buffer, size_t Size, TRACE_POINT
 
     if (!trace)
         return NULL;
+
+    memset(trace, 0, sizeof(INST_TRACE_LIST));
 
     trace->Size = 0;
 
@@ -625,6 +627,7 @@ PINST_TRACE_LIST cpthk_get_instr_trace(uint8_t *Buffer, size_t Size, TRACE_POINT
                 if (trace->Size == 0)
                 {
                     trace->Entries = malloc(sizeof(INST_TRACE));
+                    memset(trace->Entries, 0, sizeof(INST_TRACE));
                 }
                 else
                 {
@@ -653,6 +656,182 @@ PINST_TRACE_LIST cpthk_get_instr_trace(uint8_t *Buffer, size_t Size, TRACE_POINT
     }
 
     return trace;
+}
+
+PIRSTACK cpthk_ir_create_stack(size_t Size)
+{
+    PIRSTACK stack = (PIRSTACK)malloc(sizeof(IRSTACK));
+    if (!stack)
+    {
+        return NULL;
+    }
+
+    memset(stack, 0, sizeof(IRSTACK));
+
+    stack->Entries = (PIR_STACK_ENTRY)malloc(sizeof(IR_STACK_ENTRY) * Size);
+    if (!stack->Entries)
+    {
+        free(stack);
+        return NULL;
+    }
+
+    memset(stack->Entries, 0, sizeof(IR_STACK_ENTRY) * Size);
+
+    stack->Current = 0;
+    stack->Size = Size;
+    return stack;
+}
+
+void cpthk_ir_free_stack(PIRSTACK Stack)
+{
+    free(Stack->Entries);
+    free(Stack);
+}
+
+void cpthk_ir_push_stack(PIRSTACK Stack, PFLOW_GRAPH_NODE Node)
+{
+    // if current is 75% of size, double the size
+    if (Stack->Current >= Stack->Size * 0.75)
+    {
+        Stack->Size *= 2;
+        Stack->Entries = (PIR_STACK_ENTRY)realloc(Stack->Entries, sizeof(IR_STACK_ENTRY) * Stack->Size);
+        if (!Stack->Entries)
+        {
+            return;
+        }
+    }
+
+    PIR_STACK_ENTRY entry = (PIR_STACK_ENTRY)malloc(sizeof(IR_STACK_ENTRY));
+    if (!entry)
+    {
+        return;
+    }
+
+    memset(entry, 0, sizeof(IR_STACK_ENTRY));
+
+    entry->Node = Node;
+    // the first push current is 0, so we need to increment it first
+    Stack->Entries[Stack->Current++] = *entry;
+}
+
+PIR_STACK_ENTRY cpthk_ir_pop_stack(PIRSTACK Stack)
+{
+    if (Stack->Current == 0)
+    {
+        return NULL;
+    }
+
+    return &Stack->Entries[--Stack->Current];
+}
+
+bool cpthk_ir_is_stack_empty(PIRSTACK Stack)
+{
+    return Stack->Current == 0;
+}
+
+void cpthk_append_trace_list(PINST_TRACE_LIST src, PINST_TRACE_LIST dst)
+{
+    if (src->Size == 0)
+    {
+        return;
+    }
+
+    if (dst->Size == 0)
+    {
+        dst->Entries = malloc(sizeof(INST_TRACE) * src->Size);
+        memset(dst->Entries, 0, sizeof(INST_TRACE) * src->Size);
+    }
+    else
+    {
+        dst->Entries = realloc(dst->Entries, sizeof(INST_TRACE) * (dst->Size + src->Size));
+    }
+
+    memcpy(&dst->Entries[dst->Size], src->Entries, sizeof(INST_TRACE) * src->Size);
+    dst->Size += src->Size;
+}
+
+PINST_TRACE_LIST cpthk_get_instr_trace_from_blocks(PFLOW_GRAPH_NODE Node, TRACE_POINT point)
+{
+    PIRSTACK stack = cpthk_ir_create_stack(128);
+    if (!stack)
+    {
+        return NULL;
+    }
+
+    cpthk_ir_push_stack(stack, Node);
+
+    PINST_TRACE_LIST finalList = malloc(sizeof(INST_TRACE_LIST));
+
+    memset(finalList, 0, sizeof(INST_TRACE_LIST));
+
+    finalList->Size = 0;
+    finalList->Entries = NULL;
+
+    do
+    {
+        PINST_TRACE_LIST partialList = NULL;
+        PFLOW_GRAPH_NODE node = cpthk_ir_pop_stack(stack)->Node;
+
+        node->Visited = true;
+
+        if (!(node->Flags & CFG_ISRET))
+        {
+            if (node->Branch || node->BranchAlt)
+            {
+                if (node->Branch && !node->Branch->Visited)
+                {
+                    cpthk_ir_push_stack(stack, node->Branch);
+                }
+
+                if (node->BranchAlt && !node->BranchAlt->Visited)
+                {
+                    cpthk_ir_push_stack(stack, node->BranchAlt);
+                }
+            }
+            else if (!node->Branch && !node->BranchAlt && node->Next)
+            {
+                if (!node->Next->Visited)
+                {
+                    cpthk_ir_push_stack(stack, node->Next);
+                }
+            }
+
+            partialList = cpthk_get_instr_trace((uint8_t *)node->Address, node->Size, point);
+
+            if (partialList->Size > 0)
+            {
+                // append partialList to finalList
+                cpthk_append_trace_list(partialList, finalList);
+                // free partialList
+            }
+
+            cpthk_free_trace_list(partialList);
+            partialList = NULL;
+        }
+        else
+        {
+            // we found a return node, so we don't need to go further
+            // TODO: handle cases when there's only 1 basic block which is both start and end
+            if (node->Flags & CFG_ISSTART && node->Flags & CFG_ISEND)
+            {
+                // get trace from start node
+                partialList = cpthk_get_instr_trace((uint8_t *)node->Address, node->Size, point);
+                if (partialList->Size > 0)
+                {
+                    // append partialList to finalList
+                    cpthk_append_trace_list(partialList, finalList);
+                }
+
+                cpthk_free_trace_list(partialList);
+                partialList = NULL;
+            }
+        }
+
+    } while (!cpthk_ir_is_stack_empty(stack));
+
+    cpthk_ir_free_stack(stack);
+
+    return finalList;
 }
 
 PINST_TRACE_LIST cpthk_get_trace(PCONTROL_FLOW_GRAPH Cfg, TRACE_POINT point, PINST_TRACE_LIST prev)
@@ -701,43 +880,7 @@ PINST_TRACE_LIST cpthk_get_trace(PCONTROL_FLOW_GRAPH Cfg, TRACE_POINT point, PIN
 
         return list;
     case TRACE_POINT_CALLEE:
-
-        list = cpthk_get_instr_trace((uint8_t *)Cfg->Head->Address, Cfg->Head->Size, point);
-        // TODO: find a way to understand if getting trace of head block is enough
-        // or if we do need to loop through all blocks until the end
-        if (list->Size == 0 || (prev && list->Size < (prev->Size / 2)))
-        {
-            free(list);
-            list = NULL;
-            if (Cfg->Head->Branch && Cfg->Head->BranchAlt)
-            {
-                if (Cfg->Head->Branch->Size > Cfg->Head->BranchAlt->Size)
-                {
-                    list = cpthk_get_instr_trace((uint8_t *)Cfg->Head->Branch->Address, Cfg->Head->Branch->Size, point);
-                }
-                else
-                {
-                    list = cpthk_get_instr_trace((uint8_t *)Cfg->Head->BranchAlt->Address, Cfg->Head->BranchAlt->Size, point);
-                }
-            }
-            else if (Cfg->Head->Branch)
-            {
-                list = cpthk_get_instr_trace((uint8_t *)Cfg->Head->Branch->Address, Cfg->Head->Branch->Size, point);
-            }
-            else if (Cfg->Head->BranchAlt)
-            {
-                list = cpthk_get_instr_trace((uint8_t *)Cfg->Head->BranchAlt->Address, Cfg->Head->BranchAlt->Size, point);
-            }
-            else
-            {
-                list = cpthk_get_instr_trace((uint8_t *)Cfg->Head->Next->Address, Cfg->Head->Next->Size, point);
-            }
-
-            return list;
-        }
-
-        return list;
-        break;
+        return cpthk_get_instr_trace_from_blocks(Cfg->Head, point);
     case TRACE_POINT_RETURN:
         cpthk_get_text_section(&textAddr, NULL);
 
@@ -780,8 +923,6 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
     {
         return NULL;
     }
-
-    cpthk_print_traces(list2);
 
     PCALLING_CONVENTION paramCallingConvention = cpthk_emu_traces(list2, &cpu, TEMU_PRIORITIZE_READ_FLAG, TEMU_ANAL_PARAM);
 

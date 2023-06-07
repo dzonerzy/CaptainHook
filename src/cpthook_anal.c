@@ -10,12 +10,15 @@ PCFG_HASHMAP cpthk_create_hashmap(unsigned int Entries)
         return NULL;
     }
 
+    memset(hashmap, 0, sizeof(CFG_HASHMAP));
+
     hashmap->Entries = (PCFG_HASHMAP_ENTRY *)malloc(sizeof(PCFG_HASHMAP_ENTRY) * Entries);
     if (!hashmap->Entries)
     {
         free(hashmap);
         return NULL;
     }
+
     memset(hashmap->Entries, 0, sizeof(PCFG_HASHMAP_ENTRY) * Entries);
 
     hashmap->Size = Entries;
@@ -29,6 +32,8 @@ void cpthk_hashmap_set(PFLOW_GRAPH_NODE Node, PCONTROL_FLOW_GRAPH Cfg)
     {
         return;
     }
+
+    memset(entry, 0, sizeof(CFG_HASHMAP_ENTRY));
 
     entry->Address = Node->Address;
     entry->Node = Node;
@@ -64,6 +69,8 @@ PCONTROL_FLOW_GRAPH cpthk_build_cfg(uintptr_t Address)
     {
         return NULL;
     }
+
+    memset(cfg, 0, sizeof(CONTROL_FLOW_GRAPH));
 
     cfg->Map = cpthk_create_hashmap(256);
     if (!cfg->Map)
@@ -106,12 +113,16 @@ PSTACK cpthk_create_stack(size_t Size)
         return NULL;
     }
 
+    memset(stack, 0, sizeof(STACK));
+
     stack->Entries = (PSTACK_ENTRY)malloc(sizeof(STACK_ENTRY) * Size);
     if (!stack->Entries)
     {
         free(stack);
         return NULL;
     }
+
+    memset(stack->Entries, 0, sizeof(STACK_ENTRY) * Size);
 
     stack->Current = 0;
     stack->Size = Size;
@@ -142,6 +153,8 @@ void cpthk_push_stack(PSTACK Stack, uintptr_t Address, DWORD Flags, PFLOW_GRAPH_
     {
         return;
     }
+
+    memset(entry, 0, sizeof(STACK_ENTRY));
 
     entry->Address = Address;
     entry->Flags = Flags;
@@ -212,10 +225,13 @@ void cpthk_create_node(uintptr_t Address, CFG_FLAGS Flags, PFLOW_GRAPH_NODE Prev
                 return;
             }
 
+            memset(newNode2, 0, sizeof(FLOW_GRAPH_NODE));
+
             newNode2->Address = entry->Address;
             newNode2->Size = newNode->Address + newNode->Size - entry->Address;
             newNode2->Flags |= (newNode->Flags & CFG_ISCONDJMP) ? CFG_ISCONDJMP : 0;
             newNode2->Flags |= (newNode->Flags & CFG_ISJMP) ? CFG_ISJMP : 0;
+            newNode2->Visited = false;
 
             newNode2->Branch = NULL;
             newNode2->BranchAlt = NULL;
@@ -280,6 +296,8 @@ void cpthk_create_node(uintptr_t Address, CFG_FLAGS Flags, PFLOW_GRAPH_NODE Prev
             return;
         }
 
+        memset(newNode, 0, sizeof(FLOW_GRAPH_NODE));
+
         newNode->Address = entry->Address;
         newNode->Size = 0;
         newNode->Flags = entry->Flags;
@@ -288,6 +306,7 @@ void cpthk_create_node(uintptr_t Address, CFG_FLAGS Flags, PFLOW_GRAPH_NODE Prev
         newNode->Prev = NULL;
         newNode->Branch = NULL;
         newNode->BranchAlt = NULL;
+        newNode->Visited = false;
 
         newNode->Prev = oldNode;
         if (oldNode)
@@ -399,9 +418,9 @@ void cpthk_dump_node(PFLOW_GRAPH_NODE Node)
     printf("Size: %lu\n", Node->Size);
     printf("Flags: %lu\n", Node->Flags);
     if (Node->Branch)
-        printf("Branch: 0x%x\n", Node->Branch->Address);
+        printf("Branch: 0x%llx\n", Node->Branch->Address);
     if (Node->BranchAlt)
-        printf("BranchAlt: 0x%x\n", Node->BranchAlt->Address);
+        printf("BranchAlt: 0x%llx\n", Node->BranchAlt->Address);
     for (uintptr_t i = Node->Address; i < (unsigned long long)Node->Address + Node->Size;)
     {
         FdInstr instr;
@@ -467,6 +486,9 @@ void cpthk_free_cfg(PCONTROL_FLOW_GRAPH Cfg)
 PXREFS cpthk_find_xref(uintptr_t Address)
 {
     PXREFS xrefs = malloc(sizeof(XREFS));
+
+    memset(xrefs, 0, sizeof(XREFS));
+
     xrefs->Size = 0;
     xrefs->Entries = NULL;
     uintptr_t textSectionAddress = 0;

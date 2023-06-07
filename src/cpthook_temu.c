@@ -733,11 +733,6 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
     for (size_t i = 0; i < list->Size; i++)
     {
         PINST_TRACE trace = &list->Entries[i];
-
-        char *buf = cpthk_format_trace(trace);
-        printf("Executing: %s\n", buf);
-        free(buf);
-
         switch (trace->Action)
         {
         case INST_ACTION_POP:
@@ -885,8 +880,6 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
             cpthk_log_param_trace(Cpu, &logger, trace, FLAG_WRITE);
         }
     }
-
-    printf("Emulation done\n");
 
     switch (AnalFlags)
     {

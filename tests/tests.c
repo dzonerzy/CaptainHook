@@ -95,23 +95,25 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (cpthk_hook((uintptr_t)test4f, entryhook, exithook) != CPTHK_OK)
+    CPTHK_STATUS status = cpthk_hook((uintptr_t)test4i, entryhook, exithook);
+
+    if (status != CPTHK_OK)
     {
-        LOG_ERROR("Failed to hook test4i", NULL);
+        LOG_ERROR("Failed to hook test4i (%s)", cpthk_str_error(status));
         return 1;
     }
 
     system("pause");
 
-    printf("res = %f\n", test4f(1.1, 2.2, 3.3, 4.4));
+    printf("res = %d\n", test4i(1, 2, 3, 4));
 
-    if (cpthk_unhook((uintptr_t)test4f) != CPTHK_OK)
+    if (cpthk_unhook((uintptr_t)test4i) != CPTHK_OK)
     {
         LOG_ERROR("Failed to unhook test4i", NULL);
         return 1;
     }
 
-    printf("res = %f\n", test4f(1.1, 2.2, 3.3, 4.4));
+    printf("res = %d\n", test4i(1, 2, 3, 4));
 
     cpthk_uninit();
     return 0;

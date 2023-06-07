@@ -13,9 +13,14 @@ CPTHK_STATUS cpthk_init(void)
     if (!HookList)
         return CPTHK_OUT_OF_MEMORY;
 
+    memset(HookList, 0, sizeof(HOOK_LIST));
+
     HookList->Size = 128;
     HookList->Count = 0;
     HookList->Entries = (PHOOK_ENTRY)malloc(HookList->Size * sizeof(HOOK_ENTRY));
+
+    memset(HookList->Entries, 0, HookList->Size * sizeof(HOOK_ENTRY));
+
     HookListInitialized = true;
 
     if (FD_MODE == 64)
@@ -234,6 +239,7 @@ bool cpthk_hook_add_internal(PCONTROL_FLOW_GRAPH Cfg, uintptr_t HookContext, PCA
 
         // Allocate space for the trampoline
         Entry->HookContext->HookTrampolineEntry = (uintptr_t)malloc(entryReplacedBytesSize + (15 * 6));
+
         if (!Entry->HookContext->HookTrampolineEntry)
         {
             cpthk_restore_jmps(CallingConvention->EntryHookAddress, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
@@ -343,12 +349,15 @@ CPTHK_STATUS cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC Ex
     }
 
     // Allocate memory for the hook context + stubs
-    uintptr_t Hook = (uintptr_t)malloc(sizeof(CPTHOOK_CTX) + 0x1000);
+    uintptr_t Hook = (uintptr_t)malloc(sizeof(CPTHOOK_CTX) + stub_size * 2);
+
     if (!Hook)
         return CPTHK_OUT_OF_MEMORY;
 
+    memset((void *)Hook, 0, sizeof(CPTHOOK_CTX) + stub_size * 2);
+
     DWORD oldProtect = 0;
-    if (!VirtualProtect((void *)Hook, sizeof(CPTHOOK_CTX) + 0x1000, PAGE_EXECUTE_READWRITE, &oldProtect))
+    if (!VirtualProtect((void *)Hook, sizeof(CPTHOOK_CTX) + stub_size * 2, PAGE_EXECUTE_READWRITE, &oldProtect))
     {
         free((void *)Hook);
         return CPTHK_UNABLE_TO_PROTECT_MEMORY;

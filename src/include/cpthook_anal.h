@@ -37,6 +37,7 @@ typedef struct _CONTROL_FLOW_GRAPH
 
 typedef struct _FLOW_GRAPH_NODE
 {
+    bool Visited;
     uintptr_t Address;
     SIZE_T Size;
     DWORD Flags;

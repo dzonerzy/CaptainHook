@@ -138,5 +138,17 @@ typedef enum _TRACE_POINT
     TRACE_POINT_RETURN,
 } TRACE_POINT;
 
+typedef struct _IR_STACK_ENTRY
+{
+    PFLOW_GRAPH_NODE Node;
+} IR_STACK_ENTRY, *PIR_STACK_ENTRY;
+
+typedef struct _IR_STACK
+{
+    PIR_STACK_ENTRY Entries;
+    unsigned long long Current;
+    SIZE_T Size;
+} IRSTACK, *PIRSTACK;
+
 PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH Cfg);
 char *cpthk_format_trace(PINST_TRACE trace);
