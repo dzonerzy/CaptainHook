@@ -4,8 +4,8 @@
 [x] Function return type detection
 [x] Function Control Flow Graph
 [x] Function Basic Blocks
-[x] Basic Hook functionality for 64 bits
-[x] Basic Hook functionality for 32 bits
+[x] Basic Hook functionality for 64 bits (gcc & msvc)
+[x] Basic Hook functionality for 32 bits (gcc & msvc)
 [ ] Missing parameter reordering
 [ ] Missing IR for mov reg, [reg+reg]
 [ ] Missing IR for lea reg, [reg+reg]

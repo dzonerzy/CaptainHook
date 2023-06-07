@@ -2,7 +2,8 @@ project('cpthook', 'c', version : '1.0', default_options : ['warning_level=3', '
 
 # Compiler
 cc = meson.get_compiler('c')
-
+python3 = find_program('python3')
+nasm = find_program('nasm')
 
 cpthook_inc_dirs = [
   include_directories('src/include/'),
@@ -25,9 +26,6 @@ if cc.get_argument_syntax() != 'msvc'
   add_project_arguments('-Wno-overlength-strings', language: 'c')
   add_project_arguments('-Wno-format', language: 'c')
   add_project_arguments('-fno-stack-protector', language: 'c')
-  add_project_arguments('-fsanitize=address', language: 'c')
-  # add link arguments
-  add_project_link_arguments('-fsanitize=address', language: 'c')
 else
   add_project_arguments('/wd4100', language: 'c')
   add_project_arguments('/wd4244', language: 'c')
@@ -37,8 +35,19 @@ if get_option('tests')
   subdir('tests')
 endif
 
+
+stub = []
+
+stub += custom_target('cpthook_stub',
+  command: [python3, '@INPUT0@',  '-input', '@INPUT1@'] + asm_flags + ['-nasm', nasm],
+  input: files('asmcompile.py', asm_source),
+  output: ['cpthook_stub.c'],
+  install: true,
+  install_dir: [false]
+)
+
 libcpthook = static_library('cpthook', 
-  sources,
+  sources + stub,
   include_directories: cpthook_inc_dirs,
   # cflags 
   c_args: [

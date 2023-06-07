@@ -77,32 +77,42 @@ unsigned int __stdcall test4i(int f1, int f2, int f3, int f4)
     return i;
 }
 
-__stdcall void entryhook(PCPTHOOK_CTX ctx)
+void __stdcall entryhook(PCPTHOOK_CTX ctx)
 {
     LOG_INFO("Inside HookEntry", NULL);
 }
 
-__stdcall void exithook(PCPTHOOK_CTX ctx)
+void __stdcall exithook(PCPTHOOK_CTX ctx)
 {
     LOG_INFO("Inside HookExit", NULL);
-    ctx->x32.regs[0] = 1337;
+    ctx->x64.regs[0] = 1337;
 }
 
 int main(int argc, char **argv)
 {
-    if (!cpthk_init())
+    printf("[+] Using %s\n", cpthk_version());
+
+    if (cpthk_init() != CPTHK_OK)
     {
         LOG_ERROR("Failed to initialize cpthook", NULL);
         return 1;
     }
 
-    if (!cpthk_hook((uintptr_t)test4i, entryhook, exithook))
+    if (cpthk_hook((uintptr_t)test4i, entryhook, exithook) != CPTHK_OK)
     {
         LOG_ERROR("Failed to hook test4i", NULL);
         return 1;
     }
 
     system("pause");
+
+    printf("res = %d\n", test4i(1, 2, 3, 4));
+
+    if (cpthk_unhook((uintptr_t)test4i) != CPTHK_OK)
+    {
+        LOG_ERROR("Failed to unhook test4i", NULL);
+        return 1;
+    }
 
     printf("res = %d\n", test4i(1, 2, 3, 4));
 

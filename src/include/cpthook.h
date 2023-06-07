@@ -4,6 +4,14 @@
 #include <cpthook_ir.h>
 #include <cpthook_temu.h>
 
+// Versioning
+#define MAJOR_VERSION "0"
+#define MINOR_VERSION "1"
+#define PATCH_VERSION "0"
+#define CODENAME "BETA"
+
+#define VERSION_STR(M, m, p, c) M "." m "." p " [" c "]"
+
 #define HOOKSIZE 6
 
 typedef struct uint128_t
@@ -49,6 +57,7 @@ typedef void(__stdcall *HOOKFNC)(PCPTHOOK_CTX Context);
 typedef struct _HOOK_ENTRY
 {
     uintptr_t FunctionAddress;
+    size_t FunctionSize;
     bool Enabled;
     uint8_t OriginalEntryBytes[HOOKSIZE + 15];
     size_t OriginalEntrySize;
@@ -75,9 +84,27 @@ extern JMP_TABLE JmpTable;
 extern PHOOK_LIST HookList;
 extern bool HookListInitialized;
 
-bool cpthk_init(void);
-void cpthk_uninit(void);
-bool cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC ExitHook);
-bool cpthk_unhook(uintptr_t FunctionAddress);
+typedef enum CPTHK_STATUS
+{
+    CPTHK_OK = 0,
+    CPTHK_ERROR = 1,
+    CPTHK_ALREADY_INITIALIZED = 2,
+    CPTHK_NOT_INITIALIZED = 3,
+    CPTHK_UNABLE_TO_CONTROL_THREADS = 4,
+    CPTHK_UNABLE_TO_PROTECT_MEMORY = 5,
+    CPTHK_HOOK_NOT_FOUND = 6,
+    CPTHK_UNABLE_TO_BUILD_CFG = 7,
+    CPTHK_OUT_OF_MEMORY = 8,
+    CPTHK_UNABLE_TO_FIND_CALLING_CONVENTION = 9,
+    CPTHK_INTERNAL_ERROR = 10,
+    CPTHK_UNABLE_TO_QUERY_MEMORY = 11,
+} CPTHK_STATUS;
+
+CPTHK_STATUS cpthk_init(void);
+CPTHK_STATUS cpthk_uninit(void);
+CPTHK_STATUS cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC ExitHook);
+CPTHK_STATUS cpthk_unhook(uintptr_t FunctionAddress);
+char *cpthk_str_error(CPTHK_STATUS Status);
+char *cpthk_version(void);
 
 #include <cpthook_utils.h>

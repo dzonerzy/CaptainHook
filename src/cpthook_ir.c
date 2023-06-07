@@ -24,7 +24,7 @@ size_t cpthk_backward_decode(uintptr_t Start, FdInstr *instr, uintptr_t EndAddre
     }
 }
 
-uintptr_t cpthk_get_n_prev_instrs(uintptr_t Address, unsigned int n, uintptr_t EndAddress, uintptr_t MinEndAddress, size_t *Size)
+uintptr_t cpthk_get_n_prev_instrs(uintptr_t Address, unsigned int n, uintptr_t EndAddress, uintptr_t MinEndAddress, size_t *Size, bool StopAtCall)
 {
     size_t instrSize = 0;
 
@@ -43,12 +43,13 @@ uintptr_t cpthk_get_n_prev_instrs(uintptr_t Address, unsigned int n, uintptr_t E
         EndAddress -= size;
 
         // check if the instruction at EndAddress is a call
-        if (FD_TYPE(&instr) == FDI_CALL)
-        {
-            EndAddress += size;
-            instrSize -= size;
-            break;
-        }
+        if (StopAtCall)
+            if (FD_TYPE(&instr) == FDI_CALL)
+            {
+                EndAddress += size;
+                instrSize -= size;
+                break;
+            }
 
         if (EndAddress < MinEndAddress)
         {
@@ -652,7 +653,7 @@ PINST_TRACE_LIST cpthk_get_trace(PCONTROL_FLOW_GRAPH Cfg, TRACE_POINT point, PIN
             return NULL;
         }
 
-        StartAddress = cpthk_get_n_prev_instrs(textAddr, 40, xrefs->Entries[idx].Address, 0, &bufferSize);
+        StartAddress = cpthk_get_n_prev_instrs(textAddr, 40, xrefs->Entries[idx].Address, 0, &bufferSize, true);
         free(xrefs);
         list = cpthk_get_instr_trace((uint8_t *)StartAddress, bufferSize, point);
 
@@ -703,7 +704,7 @@ PINST_TRACE_LIST cpthk_get_trace(PCONTROL_FLOW_GRAPH Cfg, TRACE_POINT point, PIN
             return NULL;
         }
 
-        StartAddress = cpthk_get_n_prev_instrs(textAddr, 10, Cfg->Tail->Address + Cfg->Tail->Size, Cfg->Tail->Address, &bufferSize);
+        StartAddress = cpthk_get_n_prev_instrs(textAddr, 10, Cfg->Tail->Address + Cfg->Tail->Size, Cfg->Tail->Address, &bufferSize, false);
 
         list = cpthk_get_instr_trace((uint8_t *)StartAddress, bufferSize, point);
 
@@ -760,7 +761,7 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
     // free(cfg);
     free(returnCallingConvention);
 
-    /*printf("Calling convention:\n");
+    printf("Calling convention:\n");
     printf("  Return register: %d\n", paramCallingConvention->ReturnRegister);
     printf("  Argument count: %d\n", paramCallingConvention->ArgumentsCount);
     printf("  Arguments:\n");
@@ -771,7 +772,7 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
         printf("        %d: %s\n", i, buf);
     }
     printf("  EntryHookAddress: %p\n", paramCallingConvention->EntryHookAddress);
-    printf("  ExitHookAddress: %p\n", paramCallingConvention->ExitHookAddress);*/
+    printf("  ExitHookAddress: %p\n", paramCallingConvention->ExitHookAddress);
 
     return paramCallingConvention;
 }

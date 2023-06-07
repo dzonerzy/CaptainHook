@@ -4,14 +4,14 @@ PHOOK_LIST HookList = NULL;
 bool HookListInitialized = false;
 JMP_TABLE JmpTable = {0};
 
-bool cpthk_init(void)
+CPTHK_STATUS cpthk_init(void)
 {
     if (HookList)
-        return true;
+        return CPTHK_ALREADY_INITIALIZED;
 
     HookList = (PHOOK_LIST)malloc(sizeof(HOOK_LIST));
     if (!HookList)
-        return false;
+        return CPTHK_OUT_OF_MEMORY;
 
     HookList->Size = 128;
     HookList->Count = 0;
@@ -38,7 +38,7 @@ bool cpthk_init(void)
 
         if (VirtualQuery((void *)tableEntry, &mbi, sizeof(MEMORY_BASIC_INFORMATION)) == 0)
         {
-            return false;
+            return CPTHK_UNABLE_TO_QUERY_MEMORY;
         }
 
         // check if the table is free
@@ -51,7 +51,7 @@ bool cpthk_init(void)
         uintptr_t TableAddr = (uintptr_t)VirtualAlloc((void *)tableEntry, 0x2000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
         if (!TableAddr)
         {
-            return false;
+            return CPTHK_OUT_OF_MEMORY;
         }
 
         // initialize the table
@@ -62,18 +62,14 @@ bool cpthk_init(void)
         JmpTable.TableCapacity = 0x2000 / sizeof(uintptr_t);
         JmpTable.TableCount = 0;
     }
-    else
-    {
-        // on 32 bit we don't need a jmp table since we can use the jmp relative to the hook entry
-    }
 
-    return true;
+    return CPTHK_OK;
 }
 
-void cpthk_uninit(void)
+CPTHK_STATUS cpthk_uninit(void)
 {
     if (!HookList)
-        return;
+        return CPTHK_NOT_INITIALIZED;
 
     for (unsigned long i = 0; i < HookList->Count; i++)
     {
@@ -90,6 +86,17 @@ void cpthk_uninit(void)
     free((void *)HookList);
     HookList = NULL;
     HookListInitialized = false;
+
+    if (FD_MODE == 64)
+    {
+        if (JmpTable.TableEntry)
+        {
+            VirtualFree((void *)JmpTable.TableEntry, 0, MEM_RELEASE);
+            JmpTable.TableEntry = NULL;
+        }
+    }
+
+    return CPTHK_OK;
 }
 
 uintptr_t cpthk_get_arg(CPTHOOK_CTX Context, uint32_t ArgIndex)
@@ -177,7 +184,7 @@ void cpthk_restore_jmps(uintptr_t Address, uint8_t *Buffer, size_t OldBufSize)
     memcpy((void *)Address, Buffer, OldBufSize);
 }
 
-bool cpthk_hook_add_internal(uintptr_t FunctionAddress, uintptr_t HookContext, PCALLING_CONVENTION CallingConvention, HOOKFNC HookEntry, HOOKFNC HookExit)
+bool cpthk_hook_add_internal(PCONTROL_FLOW_GRAPH Cfg, uintptr_t HookContext, PCALLING_CONVENTION CallingConvention, HOOKFNC HookEntry, HOOKFNC HookExit)
 {
     if (HookList->Size > HookList->Count)
     {
@@ -192,7 +199,8 @@ bool cpthk_hook_add_internal(uintptr_t FunctionAddress, uintptr_t HookContext, P
 
     PHOOK_ENTRY Entry = &HookList->Entries[HookList->Count++];
 
-    Entry->FunctionAddress = FunctionAddress;
+    Entry->FunctionAddress = Cfg->Address;
+    Entry->FunctionSize = Cfg->Size;
     Entry->Enabled = true;
     Entry->HookContext = (PCPTHOOK_CTX)HookContext;
 
@@ -209,7 +217,7 @@ bool cpthk_hook_add_internal(uintptr_t FunctionAddress, uintptr_t HookContext, P
 
     size_t stubSize = 0;
 
-    if (HookEntry)
+    if (HookEntry && CallingConvention->EntryHookAddress)
     {
         // write the jmp to the entry hook
         unsigned char originalEntryBytes[HOOKSIZE + 15];
@@ -253,7 +261,7 @@ bool cpthk_hook_add_internal(uintptr_t FunctionAddress, uintptr_t HookContext, P
         }
     }
 
-    if (HookExit)
+    if (HookExit && CallingConvention->ExitHookAddress)
     {
 
         // do the same for the exit hook
@@ -317,39 +325,33 @@ bool cpthk_hook_add_internal(uintptr_t FunctionAddress, uintptr_t HookContext, P
         }
     }
 
-    printf("Function Entry Hooking Address %p\n", CallingConvention->EntryHookAddress);
-    printf("Function Exit Hooking Address %p\n", CallingConvention->ExitHookAddress);
-    printf("EntryTrampoline %p\n", Entry->HookContext->HookTrampolineEntry);
-    printf("ExitTrampoline %p\n", Entry->HookContext->HookTrampolineExit);
-    printf("HookContext start + stub : %p\n", HookContext);
-
     return true;
 }
 
-bool cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC ExitHook)
+CPTHK_STATUS cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC ExitHook)
 {
     if (!HookListInitialized)
-        return false;
+        return CPTHK_NOT_INITIALIZED;
 
     if (!cpthk_operate_threads(THREAD_OP_SUSPEND))
-        return false;
+        return CPTHK_UNABLE_TO_CONTROL_THREADS;
 
     PCONTROL_FLOW_GRAPH ControlFlowGraph = cpthk_build_cfg(FunctionAddress);
     if (!ControlFlowGraph)
     {
-        return false;
+        return CPTHK_UNABLE_TO_BUILD_CFG;
     }
 
     // Allocate memory for the hook context + stubs
     uintptr_t Hook = (uintptr_t)malloc(sizeof(CPTHOOK_CTX) + 0x1000);
     if (!Hook)
-        return false;
+        return CPTHK_OUT_OF_MEMORY;
 
     DWORD oldProtect = 0;
     if (!VirtualProtect((void *)Hook, sizeof(CPTHOOK_CTX) + 0x1000, PAGE_EXECUTE_READWRITE, &oldProtect))
     {
         free((void *)Hook);
-        return false;
+        return CPTHK_UNABLE_TO_PROTECT_MEMORY;
     }
 
     // try to find the calling convention
@@ -357,47 +359,140 @@ bool cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC ExitHook)
     if (!CallingConvention)
     {
         free((void *)Hook);
-        return false;
+        return CPTHK_UNABLE_TO_FIND_CALLING_CONVENTION;
     }
 
     if (!cpthk_protect_function(ControlFlowGraph, PAGE_EXECUTE_READWRITE))
     {
         free((void *)Hook);
-        return false;
+        return CPTHK_UNABLE_TO_PROTECT_MEMORY;
     }
 
     // Add the actual hook here
-    if (!cpthk_hook_add_internal(FunctionAddress, Hook, CallingConvention, EntryHook, ExitHook))
+    if (!cpthk_hook_add_internal(ControlFlowGraph, Hook, CallingConvention, EntryHook, ExitHook))
     {
         free((void *)Hook);
-        return false;
+        return CPTHK_INTERNAL_ERROR;
     }
     // End of hook
 
     if (!cpthk_protect_function(ControlFlowGraph, PAGE_EXECUTE_READ))
     {
         free((void *)Hook);
-        return false;
+        return CPTHK_UNABLE_TO_PROTECT_MEMORY;
     }
 
     if (!cpthk_operate_threads(THREAD_OP_RESUME))
-        return false;
+        return CPTHK_UNABLE_TO_CONTROL_THREADS;
 
     // free the CFG
     cpthk_free_cfg(ControlFlowGraph);
 
-    return true;
+    return CPTHK_OK;
 }
 
-bool cpthk_unhook(uintptr_t FunctionAddress)
+CPTHK_STATUS cpthk_unhook(uintptr_t FunctionAddress)
 {
     if (!HookListInitialized)
-        return false;
+        return CPTHK_NOT_INITIALIZED;
 
     if (!cpthk_operate_threads(THREAD_OP_SUSPEND))
-        return false;
+        return CPTHK_UNABLE_TO_CONTROL_THREADS;
+
+    DWORD oldProtect = 0;
+    bool found = false;
+
+    // loop through the hook list and find the hook
+    for (size_t i = 0; i < HookList->Count; i++)
+    {
+        if (HookList->Entries[i].FunctionAddress == FunctionAddress)
+        {
+            found = true;
+            // found the hook
+            PHOOK_ENTRY Entry = &HookList->Entries[i];
+
+            // make function writable
+            if (!VirtualProtect((void *)Entry->FunctionAddress, Entry->FunctionSize, PAGE_EXECUTE_READWRITE, &oldProtect))
+            {
+                return CPTHK_UNABLE_TO_PROTECT_MEMORY;
+            }
+
+            // restore the original bytes
+            cpthk_restore_jmps(Entry->HookContext->CallingConvention->EntryHookAddress, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
+            cpthk_restore_jmps(Entry->HookContext->CallingConvention->ExitHookAddress, Entry->OriginalExitBytes, Entry->OriginalExitSize);
+
+            // restore the protection
+            if (!VirtualProtect((void *)Entry->FunctionAddress, Entry->FunctionSize, PAGE_EXECUTE_READ, &oldProtect))
+            {
+                return CPTHK_UNABLE_TO_PROTECT_MEMORY;
+            }
+
+            // free the trampolines
+            free((void *)Entry->HookContext->HookTrampolineEntry);
+            free((void *)Entry->HookContext->HookTrampolineExit);
+
+            // free the hook context
+            free((void *)Entry->HookContext);
+
+            // free the hook entry
+            free((void *)Entry);
+
+            // shift the entries
+            for (size_t j = i; j < HookList->Count - 1; j++)
+            {
+                HookList->Entries[j] = HookList->Entries[j + 1];
+            }
+
+            // decrease the count
+            HookList->Count--;
+
+            break;
+        }
+    }
 
     if (!cpthk_operate_threads(THREAD_OP_RESUME))
-        return false;
-    return true;
+        return CPTHK_UNABLE_TO_CONTROL_THREADS;
+
+    if (!found)
+        return CPTHK_HOOK_NOT_FOUND;
+
+    return CPTHK_OK;
+}
+
+char *cpthk_str_error(CPTHK_STATUS Status)
+{
+    switch (Status)
+    {
+    case CPTHK_OK:
+        return "Operation completed successfully";
+    case CPTHK_ERROR:
+        return "Unknown error";
+    case CPTHK_ALREADY_INITIALIZED:
+        return "The library is already initialized";
+    case CPTHK_NOT_INITIALIZED:
+        return "The library is not initialized";
+    case CPTHK_UNABLE_TO_CONTROL_THREADS:
+        return "Unable to control threads";
+    case CPTHK_UNABLE_TO_PROTECT_MEMORY:
+        return "Unable to protect memory";
+    case CPTHK_HOOK_NOT_FOUND:
+        return "Hook not found";
+    case CPTHK_UNABLE_TO_BUILD_CFG:
+        return "Unable to build CFG";
+    case CPTHK_OUT_OF_MEMORY:
+        return "Out of memory";
+    case CPTHK_UNABLE_TO_FIND_CALLING_CONVENTION:
+        return "Unable to find calling convention";
+    case CPTHK_INTERNAL_ERROR:
+        return "Internal error";
+    case CPTHK_UNABLE_TO_QUERY_MEMORY:
+        return "Unable to query memory";
+    default:
+        return "Unknown error";
+    }
+}
+
+char *cpthk_version(void)
+{
+    return "CaptainHook v" VERSION_STR(MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION, CODENAME);
 }
