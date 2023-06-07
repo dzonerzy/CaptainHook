@@ -347,6 +347,19 @@ void cpthk_add_reg_reg(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORITIZE
     {
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Value += Cpu->GeneralRegisters[trace->RValue.RegValue.RegValue].Value;
+        if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG)
+            Cpu->GeneralRegisters[trace->RValue.RegValue.RegValue].Flags |= FLAG_READ;
+    }
+    else if (trace->LValue.RegValue.vec)
+    {
+        Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].OpCount++;
+        Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Value += Cpu->XMMRegisters[trace->RValue.RegValue.RegValue].Value;
+        if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+        if (Flags & TEMU_PRIORITIZE_READ_FLAG)
+            Cpu->XMMRegisters[trace->RValue.RegValue.RegValue].Flags |= FLAG_READ;
     }
 }
 
@@ -357,6 +370,70 @@ void cpthk_add_reg_imm(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORITIZE
     {
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Value += trace->RValue.ImmediateValue;
+        if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+    }
+    else if (trace->LValue.RegValue.vec)
+    {
+        Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].OpCount++;
+        Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Value += trace->RValue.ImmediateValue;
+        if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+    }
+}
+
+void cpthk_add_reg_offset(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORITIZE_FLAGS Flags)
+{
+    uintptr_t *dst = NULL;
+    // only GRP
+    if (trace->LValue.RegValue.gpr)
+    {
+        Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].OpCount++;
+        if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+        dst = &Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Value;
+    }
+    else if (trace->LValue.RegValue.vec)
+    {
+        Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].OpCount++;
+        if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+        dst = &Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Value;
+    }
+
+    if (trace->RValue.OffsetValue.gpr)
+    {
+        if (trace->RValue.OffsetValue.Reg == FD_REG_SP || trace->RValue.OffsetValue.Reg == FD_REG_BP)
+        {
+            if (Flags & TEMU_PRIORITIZE_READ_FLAG)
+                Cpu->Stack.Flags[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset] |= FLAG_READ;
+            Cpu->Stack.OpCount[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset]++;
+            *dst += Cpu->Stack.Memory[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset];
+        }
+        else
+        {
+            if (Flags & TEMU_PRIORITIZE_READ_FLAG)
+                Cpu->Mem.Flags[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset] |= FLAG_READ;
+            Cpu->Mem.OpCount[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset]++;
+            *dst += Cpu->Mem.Memory[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset];
+        }
+    }
+    else if (trace->RValue.OffsetValue.vec)
+    {
+        if (trace->RValue.OffsetValue.Reg == FD_REG_SP || trace->RValue.OffsetValue.Reg == FD_REG_BP)
+        {
+            if (Flags & TEMU_PRIORITIZE_READ_FLAG)
+                Cpu->Stack.Flags[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset] |= FLAG_READ;
+            Cpu->Stack.OpCount[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset]++;
+            *dst += Cpu->Stack.Memory[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset];
+        }
+        else
+        {
+            if (Flags & TEMU_PRIORITIZE_READ_FLAG)
+                Cpu->Mem.Flags[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset] |= FLAG_READ;
+            Cpu->Mem.OpCount[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset]++;
+            *dst += Cpu->Mem.Memory[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset];
+        }
     }
 }
 
@@ -368,6 +445,11 @@ void cpthk_sub_reg_reg(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORITIZE
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Value -= Cpu->GeneralRegisters[trace->RValue.RegValue.RegValue].Value;
     }
+    else if (trace->LValue.RegValue.vec)
+    {
+        Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].OpCount++;
+        Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Value -= Cpu->XMMRegisters[trace->RValue.RegValue.RegValue].Value;
+    }
 }
 
 void cpthk_sub_reg_imm(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORITIZE_FLAGS Flags)
@@ -377,6 +459,66 @@ void cpthk_sub_reg_imm(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORITIZE
     {
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].OpCount++;
         Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Value -= trace->RValue.ImmediateValue;
+    }
+    else if (trace->LValue.RegValue.vec)
+    {
+        Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].OpCount++;
+        Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Value -= trace->RValue.ImmediateValue;
+    }
+}
+
+void cpthk_sub_reg_offset(PINST_TRACE trace, PTEMU_CPU_CONTEXT Cpu, TEMU_PRIORITIZE_FLAGS Flags)
+{
+    uintptr_t *dst = NULL;
+    // only GRP
+    if (trace->LValue.RegValue.gpr)
+    {
+        Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].OpCount++;
+        if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+            Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+        dst = &Cpu->GeneralRegisters[trace->LValue.RegValue.RegValue].Value;
+    }
+    else if (trace->LValue.RegValue.vec)
+    {
+        Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].OpCount++;
+        if (Flags & TEMU_PRIORITIZE_WRITE_FLAG)
+            Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Flags |= FLAG_WRITE;
+        dst = &Cpu->XMMRegisters[trace->LValue.RegValue.RegValue].Value;
+    }
+
+    if (trace->RValue.OffsetValue.gpr)
+    {
+        if (trace->RValue.OffsetValue.Reg == FD_REG_SP || trace->RValue.OffsetValue.Reg == FD_REG_BP)
+        {
+            if (Flags & TEMU_PRIORITIZE_READ_FLAG)
+                Cpu->Stack.Flags[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset] |= FLAG_READ;
+            Cpu->Stack.OpCount[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset]++;
+            *dst -= Cpu->Stack.Memory[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset];
+        }
+        else
+        {
+            if (Flags & TEMU_PRIORITIZE_READ_FLAG)
+                Cpu->Mem.Flags[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset] |= FLAG_READ;
+            Cpu->Mem.OpCount[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset]++;
+            *dst -= Cpu->Mem.Memory[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset];
+        }
+    }
+    else if (trace->RValue.OffsetValue.vec)
+    {
+        if (trace->RValue.OffsetValue.Reg == FD_REG_SP || trace->RValue.OffsetValue.Reg == FD_REG_BP)
+        {
+            if (Flags & TEMU_PRIORITIZE_READ_FLAG)
+                Cpu->Stack.Flags[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset] |= FLAG_READ;
+            Cpu->Stack.OpCount[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset]++;
+            *dst -= Cpu->Stack.Memory[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset];
+        }
+        else
+        {
+            if (Flags & TEMU_PRIORITIZE_READ_FLAG)
+                Cpu->Mem.Flags[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset] |= FLAG_READ;
+            Cpu->Mem.OpCount[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset]++;
+            *dst -= Cpu->Mem.Memory[Cpu->GeneralRegisters[trace->RValue.OffsetValue.Reg].Value + trace->RValue.OffsetValue.Offset];
+        }
     }
 }
 
@@ -591,6 +733,11 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
     for (size_t i = 0; i < list->Size; i++)
     {
         PINST_TRACE trace = &list->Entries[i];
+
+        char *buf = cpthk_format_trace(trace);
+        printf("Executing: %s\n", buf);
+        free(buf);
+
         switch (trace->Action)
         {
         case INST_ACTION_POP:
@@ -671,6 +818,7 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
             case TRACE_TYPE_MATH:
                 switch (FD_TYPE(&trace->Instr))
                 {
+                case FDI_SSE_ADDSS:
                 case FDI_ADD:
                     switch (trace->Lt)
                     {
@@ -683,6 +831,9 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
                         case TRACE_IMMEDIATE:
                             cpthk_add_reg_imm(trace, Cpu, Flags);
                             break;
+                        case TRACE_OFFSET:
+                            cpthk_add_reg_offset(trace, Cpu, Flags);
+                            break;
                         default:
                             break;
                         }
@@ -691,6 +842,7 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
                         break;
                     }
                     break;
+                case FDI_SSE_SUBSS:
                 case FDI_SUB:
                     switch (trace->Lt)
                     {
@@ -702,6 +854,9 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
                             break;
                         case TRACE_IMMEDIATE:
                             cpthk_sub_reg_imm(trace, Cpu, Flags);
+                            break;
+                        case TRACE_OFFSET:
+                            cpthk_sub_reg_offset(trace, Cpu, Flags);
                             break;
                         default:
                             break;
@@ -730,6 +885,8 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
             cpthk_log_param_trace(Cpu, &logger, trace, FLAG_WRITE);
         }
     }
+
+    printf("Emulation done\n");
 
     switch (AnalFlags)
     {

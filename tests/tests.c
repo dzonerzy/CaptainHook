@@ -46,7 +46,7 @@ unsigned int factorial(int n)
     return result;
 }
 
-unsigned int __stdcall test4f(float f1, float f2, float f3, float f4, float f5, float f6, float f7, float f8)
+unsigned int __stdcall test4f(float f1, float f2, float f3, float f4)
 {
     int i = f1;
     if (i < f2 + f3)
@@ -55,10 +55,7 @@ unsigned int __stdcall test4f(float f1, float f2, float f3, float f4, float f5, 
     }
     else
     {
-        for (int j = 0; j < 10; ++j)
-        {
-            i *= f4 - (f5 + f6 + f7 + f8);
-        }
+        i += f4;
     }
     return i;
 }
@@ -66,7 +63,7 @@ unsigned int __stdcall test4f(float f1, float f2, float f3, float f4, float f5, 
 unsigned int __stdcall test4i(int f1, int f2, int f3, int f4)
 {
     int i = f1;
-    if (i < f2 + f3)
+    if (i < f2 - f3)
     {
         i += f2 + f3;
     }
@@ -98,7 +95,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (cpthk_hook((uintptr_t)test4i, entryhook, exithook) != CPTHK_OK)
+    if (cpthk_hook((uintptr_t)test4f, entryhook, exithook) != CPTHK_OK)
     {
         LOG_ERROR("Failed to hook test4i", NULL);
         return 1;
@@ -106,15 +103,15 @@ int main(int argc, char **argv)
 
     system("pause");
 
-    printf("res = %d\n", test4i(1, 2, 3, 4));
+    printf("res = %f\n", test4f(1.1, 2.2, 3.3, 4.4));
 
-    if (cpthk_unhook((uintptr_t)test4i) != CPTHK_OK)
+    if (cpthk_unhook((uintptr_t)test4f) != CPTHK_OK)
     {
         LOG_ERROR("Failed to unhook test4i", NULL);
         return 1;
     }
 
-    printf("res = %d\n", test4i(1, 2, 3, 4));
+    printf("res = %f\n", test4f(1.1, 2.2, 3.3, 4.4));
 
     cpthk_uninit();
     return 0;

@@ -139,3 +139,4 @@ typedef enum _TRACE_POINT
 } TRACE_POINT;
 
 PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH Cfg);
+char *cpthk_format_trace(PINST_TRACE trace);

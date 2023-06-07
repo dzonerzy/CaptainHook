@@ -118,7 +118,9 @@ char *cpthk_format_trace(PINST_TRACE trace)
     case TRACE_REG:
         if (trace->Type == TRACE_TYPE_MATH)
         {
-            snprintf(buffer + offset, 128, "$0 %c REG[%u]", FD_TYPE(&trace->Instr) == FDI_ADD ? '+' : '-', trace->RValue.RegValue.RegValue);
+            snprintf(buffer + offset, 128, "$0 %c REG[%u]", FD_TYPE(&trace->Instr) == FDI_ADD ? '+' : FDI_SSE_ADDSS ? '+'
+                                                                                                                    : '-',
+                     trace->RValue.RegValue.RegValue);
         }
         else
         {
@@ -126,12 +128,23 @@ char *cpthk_format_trace(PINST_TRACE trace)
         }
         break;
     case TRACE_OFFSET:
-        snprintf(buffer + offset, 128, "OFF[REG[%d] + %lld]", trace->RValue.OffsetValue.Reg, trace->RValue.OffsetValue.Offset);
+        if (trace->Type == TRACE_TYPE_MATH)
+        {
+            snprintf(buffer + offset, 128, "$0 %c OFF[REG[%d] + %lld]", FD_TYPE(&trace->Instr) == FDI_ADD ? '+' : FDI_SSE_ADDSS ? '+'
+                                                                                                                                : '-',
+                     trace->RValue.OffsetValue.Reg, trace->RValue.OffsetValue.Offset);
+        }
+        else
+        {
+            snprintf(buffer + offset, 128, "OFF[REG[%d] + %lld]", trace->RValue.OffsetValue.Reg, trace->RValue.OffsetValue.Offset);
+        }
         break;
     case TRACE_IMMEDIATE:
         if (trace->Type == TRACE_TYPE_MATH)
         {
-            snprintf(buffer + offset, 128, "$0 %c IMM[%lld]", FD_TYPE(&trace->Instr) == FDI_ADD ? '+' : '-', trace->RValue.ImmediateValue);
+            snprintf(buffer + offset, 128, "$0 %c IMM[%lld]", FD_TYPE(&trace->Instr) == FDI_ADD ? '+' : FDI_SSE_ADDSS ? '+'
+                                                                                                                      : '-',
+                     trace->RValue.ImmediateValue);
         }
         else
         {
@@ -286,6 +299,8 @@ PINST_TRACE_LIST cpthk_get_instr_trace(uint8_t *Buffer, size_t Size, TRACE_POINT
                     valid = false;
                 }
                 break;
+            case FDI_SSE_SUBSS:
+            case FDI_SSE_ADDSS:
             case FDI_SUB:
             case FDI_ADD:
                 traceEntry.Type = TRACE_TYPE_MATH;
@@ -300,8 +315,8 @@ PINST_TRACE_LIST cpthk_get_instr_trace(uint8_t *Buffer, size_t Size, TRACE_POINT
                     traceEntry.Rt = TRACE_REG;
                 else if (FD_OP_TYPE(&instr, 1) == FD_OT_IMM)
                     traceEntry.Rt = TRACE_IMMEDIATE;
-                else
-                    traceEntry.Rt = TRACE_UNKNOWN;
+                else if (FD_OP_TYPE(&instr, 1) == FD_OT_MEM)
+                    traceEntry.Rt = TRACE_OFFSET;
 
                 switch (traceEntry.Lt)
                 {
@@ -333,6 +348,33 @@ PINST_TRACE_LIST cpthk_get_instr_trace(uint8_t *Buffer, size_t Size, TRACE_POINT
                     break;
                 case TRACE_IMMEDIATE:
                     traceEntry.RValue.ImmediateValue = FD_OP_IMM(&instr, 1);
+                    break;
+                case TRACE_OFFSET:
+                    traceEntry.RValue.OffsetValue.Reg = FD_OP_BASE(&instr, 1);
+                    if (traceEntry.RValue.OffsetValue.Reg == FD_REG_NONE)
+                    {
+                        traceEntry.RValue.OffsetValue.Reg = FD_SEGMENT(&instr);
+                        if (traceEntry.RValue.OffsetValue.Reg == FD_REG_NONE)
+                        {
+                            traceEntry.RValue.OffsetValue.Reg = FD_REG_IP;
+                        }
+                        else
+                        {
+                            if (traceEntry.RValue.OffsetValue.Reg == FD_REG_CS)
+                                traceEntry.RValue.OffsetValue.Reg = FD_REG_IP;
+                            else if (traceEntry.RValue.OffsetValue.Reg == FD_REG_DS)
+                                traceEntry.RValue.OffsetValue.Reg = FD_REG_SI;
+                            else if (traceEntry.RValue.OffsetValue.Reg == FD_REG_ES)
+                                traceEntry.RValue.OffsetValue.Reg = FD_REG_DI;
+                            else if (traceEntry.RValue.OffsetValue.Reg == FD_REG_SS)
+                                traceEntry.RValue.OffsetValue.Reg = FD_REG_SP;
+                        }
+                    }
+                    traceEntry.RValue.OffsetValue.gpr = true;
+                    if (traceEntry.RValue.OffsetValue.Reg == FD_REG_IP)
+                        traceEntry.RValue.OffsetValue.Offset = 0;
+                    else
+                        traceEntry.RValue.OffsetValue.Offset = FD_OP_DISP(&instr, 1);
                     break;
                 default:
                     break;
@@ -738,6 +780,8 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
     {
         return NULL;
     }
+
+    cpthk_print_traces(list2);
 
     PCALLING_CONVENTION paramCallingConvention = cpthk_emu_traces(list2, &cpu, TEMU_PRIORITIZE_READ_FLAG, TEMU_ANAL_PARAM);
 
