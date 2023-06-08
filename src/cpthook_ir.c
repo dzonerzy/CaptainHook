@@ -238,6 +238,166 @@ PINST_TRACE_LIST cpthk_get_instr_trace(uint8_t *Buffer, size_t Size, TRACE_POINT
 
             switch (iType)
             {
+            case FDI_XOR:
+            case FDI_SSE_XORPS:
+            case FDI_SSE_XORPD:
+                // treat xor as mov reg, 0
+                traceEntry.Type = TRACE_TYPE_STORE;
+                traceEntry.Instr = instr;
+
+                if (FD_OP_TYPE(&instr, 0) == FD_OT_REG)
+                    traceEntry.Lt = TRACE_REG;
+                else
+                    traceEntry.Lt = TRACE_UNKNOWN;
+
+                switch (traceEntry.Lt)
+                {
+                case TRACE_REG:
+                    traceEntry.LValue.RegValue.RegValue = FD_OP_REG(&instr, 0);
+                    regType = FD_OP_REG_TYPE(&instr, 0);
+                    if (regType == FD_RT_VEC)
+                        traceEntry.LValue.RegValue.vec = true;
+                    else if (regType == FD_RT_GPL || regType == FD_RT_GPH)
+                        traceEntry.LValue.RegValue.gpr = true;
+                    else if (regType == FD_RT_FPU)
+                        traceEntry.LValue.RegValue.fpu = true;
+                    break;
+                default:
+                    break;
+                }
+
+                traceEntry.Rt = TRACE_IMMEDIATE;
+                traceEntry.RValue.ImmediateValue = 0;
+                valid = true;
+                break;
+            case FDI_SSE_CVTDQ2PD:
+            case FDI_SSE_CVTDQ2PS:
+            case FDI_SSE_CVTPD2DQ:
+            case FDI_SSE_CVTPD2PS:
+            case FDI_SSE_CVTPS2DQ:
+            case FDI_SSE_CVTPS2PD:
+            case FDI_SSE_CVTSD2SI:
+            case FDI_SSE_CVTSD2SS:
+            case FDI_SSE_CVTSI2SD:
+            case FDI_SSE_CVTSI2SS:
+            case FDI_SSE_CVTSS2SD:
+            case FDI_SSE_CVTSS2SI:
+            case FDI_SSE_CVTTPD2DQ:
+            case FDI_SSE_CVTTPS2DQ:
+            case FDI_SSE_CVTTSD2SI:
+            case FDI_SSE_CVTTSS2SI:
+                // floating point conversion this is usually used to store the result of a math operation to a 32 bit register4
+                // treat as a mov instruction
+                traceEntry.Type = TRACE_TYPE_STORE;
+                traceEntry.Instr = instr;
+
+                if (FD_OP_TYPE(&instr, 0) == FD_OT_REG)
+                    traceEntry.Lt = TRACE_REG;
+                else if (FD_OP_TYPE(&instr, 0) == FD_OT_MEM)
+                    traceEntry.Lt = TRACE_OFFSET;
+                else
+                    traceEntry.Lt = TRACE_UNKNOWN;
+
+                if (FD_OP_TYPE(&instr, 1) == FD_OT_REG)
+                    traceEntry.Rt = TRACE_REG;
+                else if (FD_OP_TYPE(&instr, 1) == FD_OT_IMM)
+                    traceEntry.Rt = TRACE_IMMEDIATE;
+                else if (FD_OP_TYPE(&instr, 1) == FD_OT_MEM)
+                    traceEntry.Rt = TRACE_OFFSET;
+                else
+                    traceEntry.Rt = TRACE_UNKNOWN;
+
+                switch (traceEntry.Lt)
+                {
+                case TRACE_REG:
+                    traceEntry.LValue.RegValue.RegValue = FD_OP_REG(&instr, 0);
+                    regType = FD_OP_REG_TYPE(&instr, 0);
+                    if (regType == FD_RT_VEC)
+                        traceEntry.LValue.RegValue.vec = true;
+                    else if (regType == FD_RT_GPL || regType == FD_RT_GPH)
+                        traceEntry.LValue.RegValue.gpr = true;
+                    else if (regType == FD_RT_FPU)
+                        traceEntry.LValue.RegValue.fpu = true;
+                    break;
+                case TRACE_OFFSET:
+                    traceEntry.LValue.OffsetValue.Reg = FD_OP_BASE(&instr, 0);
+                    if (traceEntry.LValue.OffsetValue.Reg == FD_REG_NONE)
+                    {
+                        traceEntry.LValue.OffsetValue.Reg = FD_SEGMENT(&instr);
+                        if (traceEntry.LValue.OffsetValue.Reg == FD_REG_NONE)
+                        {
+                            traceEntry.LValue.OffsetValue.Reg = FD_REG_IP;
+                        }
+                        else
+                        {
+                            if (traceEntry.LValue.OffsetValue.Reg == FD_REG_CS)
+                                traceEntry.LValue.OffsetValue.Reg = FD_REG_IP;
+                            else if (traceEntry.LValue.OffsetValue.Reg == FD_REG_DS)
+                                traceEntry.LValue.OffsetValue.Reg = FD_REG_SI;
+                            else if (traceEntry.LValue.OffsetValue.Reg == FD_REG_ES)
+                                traceEntry.LValue.OffsetValue.Reg = FD_REG_DI;
+                            else if (traceEntry.LValue.OffsetValue.Reg == FD_REG_SS)
+                                traceEntry.LValue.OffsetValue.Reg = FD_REG_SP;
+                        }
+                    }
+                    traceEntry.LValue.OffsetValue.gpr = true;
+                    if (traceEntry.LValue.OffsetValue.Reg == FD_REG_IP)
+                        traceEntry.LValue.OffsetValue.Offset = 0;
+                    else
+                        traceEntry.LValue.OffsetValue.Offset = FD_OP_DISP(&instr, 0);
+                    break;
+                default:
+                    break;
+                }
+
+                switch (traceEntry.Rt)
+                {
+                case TRACE_REG:
+                    traceEntry.RValue.RegValue.RegValue = FD_OP_REG(&instr, 1);
+                    regType = FD_OP_REG_TYPE(&instr, 1);
+                    if (regType == FD_RT_VEC)
+                        traceEntry.RValue.RegValue.vec = true;
+                    else if (regType == FD_RT_GPL || regType == FD_RT_GPH)
+                        traceEntry.RValue.RegValue.gpr = true;
+                    else if (regType == FD_RT_FPU)
+                        traceEntry.RValue.RegValue.fpu = true;
+                    break;
+                case TRACE_IMMEDIATE:
+                    traceEntry.RValue.ImmediateValue = FD_OP_IMM(&instr, 1);
+                    break;
+                case TRACE_OFFSET:
+                    traceEntry.RValue.OffsetValue.Reg = FD_OP_BASE(&instr, 1);
+                    if (traceEntry.RValue.OffsetValue.Reg == FD_REG_NONE)
+                    {
+                        traceEntry.RValue.OffsetValue.Reg = FD_SEGMENT(&instr);
+                        if (traceEntry.RValue.OffsetValue.Reg == FD_REG_NONE)
+                        {
+                            traceEntry.RValue.OffsetValue.Reg = FD_REG_IP;
+                        }
+                        else
+                        {
+                            if (traceEntry.RValue.OffsetValue.Reg == FD_REG_CS)
+                                traceEntry.RValue.OffsetValue.Reg = FD_REG_IP;
+                            else if (traceEntry.RValue.OffsetValue.Reg == FD_REG_DS)
+                                traceEntry.RValue.OffsetValue.Reg = FD_REG_SI;
+                            else if (traceEntry.RValue.OffsetValue.Reg == FD_REG_ES)
+                                traceEntry.RValue.OffsetValue.Reg = FD_REG_DI;
+                            else if (traceEntry.RValue.OffsetValue.Reg == FD_REG_SS)
+                                traceEntry.RValue.OffsetValue.Reg = FD_REG_SP;
+                        }
+                    }
+                    traceEntry.RValue.OffsetValue.gpr = true;
+                    if (traceEntry.RValue.OffsetValue.Reg == FD_REG_IP)
+                        traceEntry.RValue.OffsetValue.Offset = 0;
+                    else
+                        traceEntry.RValue.OffsetValue.Offset = FD_OP_DISP(&instr, 1);
+                    break;
+                default:
+                    break;
+                }
+
+                valid = true;
+                break;
             case FDI_PUSH:
                 traceEntry.Type = TRACE_TYPE_STORE;
                 traceEntry.Instr = instr;
@@ -919,8 +1079,6 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
     {
         return NULL;
     }
-
-    printf("---------------------------------------------\n");
 
     cpthk_emu_traces(list, &cpu, TEMU_PRIORITIZE_WRITE_FLAG, TEMU_NO_ANAL);
 

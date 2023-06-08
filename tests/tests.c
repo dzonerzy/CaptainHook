@@ -46,9 +46,9 @@ unsigned int factorial(int n)
     return result;
 }
 
-unsigned int __stdcall test4f(float f1, float f2, float f3, float f4)
+float __stdcall test4f(float f1, float f2, float f3, float f4)
 {
-    float res = 0.0f;
+    float res = 4.0f;
     if (f3 < 6.0)
     {
         res += f2 + f3;
@@ -82,6 +82,7 @@ void __stdcall entryhook(PCPTHOOK_CTX ctx)
 void __stdcall exithook(PCPTHOOK_CTX ctx)
 {
     LOG_INFO("Inside HookExit", NULL);
+    ctx->x32.regs[FD_REG_AX] = (unsigned long)(float)1.337f;
 }
 
 int main(int argc, char **argv)
@@ -104,7 +105,7 @@ int main(int argc, char **argv)
 
     system("pause");
 
-    printf("res = %d\n", test4f(1.1, 2.2, 3.3, 4.4));
+    printf("res = %f\n", test4f(1.1, 2.2, 3.3, 4.4));
 
     if (cpthk_unhook((uintptr_t)test4f) != CPTHK_OK)
     {
@@ -112,7 +113,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    printf("res = %d\n", test4f(1.1, 2.2, 3.3, 4.4));
+    printf("res = %f\n", test4f(1.1, 2.2, 3.3, 4.4));
 
     cpthk_uninit();
     return 0;

@@ -91,6 +91,7 @@ typedef struct _XREFS
 
 #define IS_RET(instr) (FD_TYPE(&instr) == FDI_RET || FD_TYPE(&instr) == FDI_RETF || FD_TYPE(&instr) == FDI_IRET)
 #define IS_JMP(instr) (FD_TYPE(&instr) == FDI_JMP)
+#define IS_CALL(instr) (FD_TYPE(&instr) == FDI_CALL)
 #define IS_CONDJMP(instr) (FD_TYPE(&instr) >= FDI_JA && FD_TYPE(&instr) <= FDI_JZ && FD_TYPE(&instr) != FDI_JMP)
 #define IS_JMPREG(instr) (ISJMP(instr) || ISCONDJMP(instr) && FD_OP_TYPE(&instr, 0) == FD_OP_REG)
 #define IS_BRANCH(flags) (flags & CFG_ISBRANCH)

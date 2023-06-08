@@ -122,7 +122,8 @@ bool cpthk_write_trampoline(uintptr_t TrampolineAddr, uintptr_t OriginalHook, ui
 
     // copy the original bytes to the trampoline take care of possible jumps which now are not valid anymore
     size_t trampolineSize = 0;
-    size_t writeSize = 0;
+    size_t writeOffset = 0;
+    size_t readOffset = 0;
     FdInstr instr;
     uint8_t *decodeAddress = originalBytes;
 
@@ -137,32 +138,58 @@ bool cpthk_write_trampoline(uintptr_t TrampolineAddr, uintptr_t OriginalHook, ui
                 {
                     // TODO: this won't work if jmp location is inside the trampoline itself
                     uintptr_t jmpAddress = FD_OP_IMM(&instr, 0);
-                    *(unsigned char *)(TrampolineAddr + writeSize) = *(unsigned char *)decodeAddress; // copy the first byte
-                    *(unsigned char *)(TrampolineAddr + writeSize + 1) = 0x0e;
+                    // jmp address is relative to OriginalHook + trampolineSize , but we are writing to TrampolineAddr
+                    // so we need to recalculate the address to be relative to TrampolineAddr
+                    jmpAddress = jmpAddress - (OriginalHook + trampolineSize) + TrampolineAddr;
+                    *(unsigned char *)(TrampolineAddr + writeOffset) = *(unsigned char *)decodeAddress; // copy the first byte
+                    *(unsigned char *)(TrampolineAddr + writeOffset + 1) = 0x0e;
                     // JMP + 12
-                    *(unsigned short *)(TrampolineAddr + writeSize + 2) = 0x0b0e;
+                    *(unsigned short *)(TrampolineAddr + writeOffset + 2) = 0x0b0e;
                     // JMP [RIP]
-                    JMP_ABSOLUTE64(TrampolineAddr + writeSize + 4, jmpAddress);
-                    writeSize += 18;
+                    JMP_ABSOLUTE64(TrampolineAddr + writeOffset + 4, jmpAddress);
+                    writeOffset += 18;
                 }
                 else
                 {
                     // TODO: this won't work if jmp location is inside the trampoline itself
                     uintptr_t jmpAddress = FD_OP_IMM(&instr, 0);
-                    *(unsigned char *)(TrampolineAddr + writeSize) = *(unsigned char *)decodeAddress; // copy the first byte
-                    *(unsigned char *)(TrampolineAddr + writeSize + 1) = 0x0e;
+                    *(unsigned char *)(TrampolineAddr + writeOffset) = *(unsigned char *)decodeAddress; // copy the first byte
+                    *(unsigned char *)(TrampolineAddr + writeOffset + 1) = 0x0e;
                     // JMP + 9
-                    *(unsigned short *)(TrampolineAddr + writeSize + 2) = 0xeb05;
+                    *(unsigned short *)(TrampolineAddr + writeOffset + 2) = 0xeb05;
                     // JMP jmpAddress
-                    JMP_RELATIVE32(TrampolineAddr + writeSize + 4, jmpAddress);
+                    JMP_RELATIVE32(TrampolineAddr + writeOffset + 4, jmpAddress);
+                    writeOffset += 9;
+                }
+            }
+            else if (IS_CALL(instr))
+            {
+                if (FD_MODE == 64)
+                {
+                    uintptr_t callAddress = FD_OP_IMM(&instr, 0);
+                    // call address is relative to OriginalHook + trampolineSize , but we are writing to TrampolineAddr
+                    // so we need to recalculate the address to be relative to TrampolineAddr
+                    callAddress = callAddress - (OriginalHook + trampolineSize) + TrampolineAddr + writeOffset;
+                    *(unsigned char *)(TrampolineAddr + writeOffset) = *(unsigned char *)decodeAddress; // copy the first byte
+                    *(DWORD *)(TrampolineAddr + writeOffset + 1) = (DWORD)(callAddress - (TrampolineAddr + writeOffset + 5));
+                    writeOffset += 5;
+                }
+                else
+                {
+                    uintptr_t callAddress = FD_OP_IMM(&instr, 0);
+                    // on 32 bit the call address is absolute so we don't need to recalculate it
+                    *(unsigned char *)(TrampolineAddr + writeOffset) = *(unsigned char *)decodeAddress; // copy the first byte
+                    *(DWORD *)(TrampolineAddr + writeOffset + 1) = (DWORD)(callAddress - (TrampolineAddr + writeOffset + 5));
+                    writeOffset += 5;
                 }
             }
             else
             {
-                memcpy((void *)(TrampolineAddr + writeSize), decodeAddress, ret);
-                trampolineSize += ret;
-                writeSize += ret;
+                memcpy((void *)(TrampolineAddr + writeOffset), decodeAddress, ret);
+                writeOffset += ret;
             }
+
+            trampolineSize += ret;
         }
         else
         {
@@ -174,11 +201,11 @@ bool cpthk_write_trampoline(uintptr_t TrampolineAddr, uintptr_t OriginalHook, ui
 
     if (FD_MODE == 64)
     {
-        JMP_ABSOLUTE64(TrampolineAddr + writeSize, OriginalHook + originalBytesSize);
+        JMP_ABSOLUTE64(TrampolineAddr + writeOffset, OriginalHook + originalBytesSize);
     }
     else
     {
-        JMP_RELATIVE32(TrampolineAddr + writeSize, OriginalHook + originalBytesSize);
+        JMP_RELATIVE32(TrampolineAddr + writeOffset, OriginalHook + originalBytesSize);
     }
 
     return true;

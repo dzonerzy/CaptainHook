@@ -1134,14 +1134,22 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
         }
         break;
     case TEMU_ANAL_RETURN:
-        for (size_t i = logger.TraceCount - 1; i >= 0; i--)
+        if (logger.TraceCount > 0)
         {
-            if (logger.TraceLog[i].Trace.Lt == TRACE_REG && (logger.TraceLog[i].Trace.LValue.RegValue.RegValue != FD_REG_SP && logger.TraceLog[i].Trace.LValue.RegValue.RegValue != FD_REG_BP))
+            for (size_t i = logger.TraceCount - 1; i >= 0; i--)
             {
-                cc->ReturnRegister = logger.TraceLog[i].Trace.LValue.RegValue.RegValue;
-                cc->ExitHookAddress = logger.TraceLog[i].Trace.Address + FD_SIZE(&logger.TraceLog[i].Trace.Instr);
-                break;
+                if (logger.TraceLog[i].Trace.Lt == TRACE_REG && (logger.TraceLog[i].Trace.LValue.RegValue.RegValue != FD_REG_SP && logger.TraceLog[i].Trace.LValue.RegValue.RegValue != FD_REG_BP))
+                {
+                    cc->ReturnRegister = logger.TraceLog[i].Trace.LValue.RegValue.RegValue;
+                    cc->ExitHookAddress = logger.TraceLog[i].Trace.Address + FD_SIZE(&logger.TraceLog[i].Trace.Instr);
+                    break;
+                }
             }
+        }
+        else
+        {
+            cc->ReturnRegister = FD_REG_NONE;
+            cc->ExitHookAddress = 0;
         }
         break;
     default:
