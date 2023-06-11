@@ -226,8 +226,17 @@ bool cpthk_protect_function(PCONTROL_FLOW_GRAPH Cfg, DWORD Protection)
         return false;
 
     DWORD oldProtect;
-    if (!VirtualProtect((void *)Cfg->Address, Cfg->Size, Protection, &oldProtect))
-        return false;
+
+    if (!(Cfg->Head->Flags & CFG_HAVE_MEM_JMP))
+    {
+        if (!VirtualProtect((void *)Cfg->Address, Cfg->Size, Protection, &oldProtect))
+            return false;
+    }
+    else
+    {
+        if (!VirtualProtect((void *)Cfg->Head->Branch->Address, Cfg->Size, Protection, &oldProtect))
+            return false;
+    }
 
     return true;
 }

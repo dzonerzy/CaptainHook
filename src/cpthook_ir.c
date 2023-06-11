@@ -36,7 +36,8 @@ uintptr_t cpthk_get_n_prev_instrs(uintptr_t Address, unsigned int n, uintptr_t E
 
         if (size == 0)
         {
-            return 0;
+            break;
+            // return 0;
         }
 
         instrSize += size;
@@ -51,10 +52,10 @@ uintptr_t cpthk_get_n_prev_instrs(uintptr_t Address, unsigned int n, uintptr_t E
                 break;
             }
 
-        if (EndAddress < MinEndAddress)
+        if (EndAddress <= MinEndAddress)
         {
-            EndAddress += size;
-            instrSize -= size;
+            // EndAddress += size;
+            // instrSize -= size;
             break;
         }
     }
@@ -429,9 +430,39 @@ PINST_TRACE_LIST cpthk_get_instr_trace(uint8_t *Buffer, size_t Size, TRACE_POINT
                     traceEntry.RValue.ImmediateValue = FD_OP_IMM(&instr, 0);
                     valid = true;
                 }
-                else
+                else if (FD_OP_TYPE(&instr, 0) == FD_OT_MEM)
                 {
-                    valid = false;
+                    traceEntry.Lt = TRACE_OFFSET;
+                    traceEntry.LValue.OffsetValue.Reg = FD_REG_SP;
+                    traceEntry.LValue.OffsetValue.Offset = 0;
+                    traceEntry.LValue.OffsetValue.gpr = true;
+                    traceEntry.Rt = TRACE_OFFSET;
+                    traceEntry.RValue.OffsetValue.Reg = FD_OP_BASE(&instr, 0);
+                    if (traceEntry.RValue.OffsetValue.Reg == FD_REG_NONE)
+                    {
+                        traceEntry.RValue.OffsetValue.Reg = FD_SEGMENT(&instr);
+                        if (traceEntry.RValue.OffsetValue.Reg == FD_REG_NONE)
+                        {
+                            traceEntry.RValue.OffsetValue.Reg = FD_REG_IP;
+                        }
+                        else
+                        {
+                            if (traceEntry.RValue.OffsetValue.Reg == FD_REG_CS)
+                                traceEntry.RValue.OffsetValue.Reg = FD_REG_IP;
+                            else if (traceEntry.RValue.OffsetValue.Reg == FD_REG_DS)
+                                traceEntry.RValue.OffsetValue.Reg = FD_REG_SI;
+                            else if (traceEntry.RValue.OffsetValue.Reg == FD_REG_ES)
+                                traceEntry.RValue.OffsetValue.Reg = FD_REG_DI;
+                            else if (traceEntry.RValue.OffsetValue.Reg == FD_REG_SS)
+                                traceEntry.RValue.OffsetValue.Reg = FD_REG_SP;
+                        }
+                    }
+                    traceEntry.RValue.OffsetValue.gpr = true;
+                    if (traceEntry.RValue.OffsetValue.Reg == FD_REG_IP)
+                        traceEntry.RValue.OffsetValue.Offset = 0;
+                    else
+                        traceEntry.RValue.OffsetValue.Offset = FD_OP_DISP(&instr, 0);
+                    valid = true;
                 }
                 break;
             case FDI_POP:
@@ -456,9 +487,39 @@ PINST_TRACE_LIST cpthk_get_instr_trace(uint8_t *Buffer, size_t Size, TRACE_POINT
                     traceEntry.RValue.OffsetValue.gpr = true;
                     valid = true;
                 }
-                else
+                else if (FD_OP_TYPE(&instr, 0) == FD_OT_MEM)
                 {
-                    valid = false;
+                    traceEntry.Lt = TRACE_OFFSET;
+                    traceEntry.LValue.OffsetValue.Reg = FD_REG_SP;
+                    traceEntry.LValue.OffsetValue.Offset = 0;
+                    traceEntry.LValue.OffsetValue.gpr = true;
+                    traceEntry.Rt = TRACE_OFFSET;
+                    traceEntry.RValue.OffsetValue.Reg = FD_OP_BASE(&instr, 0);
+                    if (traceEntry.RValue.OffsetValue.Reg == FD_REG_NONE)
+                    {
+                        traceEntry.RValue.OffsetValue.Reg = FD_SEGMENT(&instr);
+                        if (traceEntry.RValue.OffsetValue.Reg == FD_REG_NONE)
+                        {
+                            traceEntry.RValue.OffsetValue.Reg = FD_REG_IP;
+                        }
+                        else
+                        {
+                            if (traceEntry.RValue.OffsetValue.Reg == FD_REG_CS)
+                                traceEntry.RValue.OffsetValue.Reg = FD_REG_IP;
+                            else if (traceEntry.RValue.OffsetValue.Reg == FD_REG_DS)
+                                traceEntry.RValue.OffsetValue.Reg = FD_REG_SI;
+                            else if (traceEntry.RValue.OffsetValue.Reg == FD_REG_ES)
+                                traceEntry.RValue.OffsetValue.Reg = FD_REG_DI;
+                            else if (traceEntry.RValue.OffsetValue.Reg == FD_REG_SS)
+                                traceEntry.RValue.OffsetValue.Reg = FD_REG_SP;
+                        }
+                    }
+                    traceEntry.RValue.OffsetValue.gpr = true;
+                    if (traceEntry.RValue.OffsetValue.Reg == FD_REG_IP)
+                        traceEntry.RValue.OffsetValue.Offset = 0;
+                    else
+                        traceEntry.RValue.OffsetValue.Offset = FD_OP_DISP(&instr, 0);
+                    valid = true;
                 }
                 break;
             case FDI_SSE_SUBSS:
@@ -708,6 +769,11 @@ PINST_TRACE_LIST cpthk_get_instr_trace(uint8_t *Buffer, size_t Size, TRACE_POINT
                     break;
                 default:
                     break;
+                }
+
+                if (traceEntry.LValue.RegValue.vec)
+                {
+                    printf("FPU register used as left operand\n");
                 }
 
                 valid = true;
@@ -1006,6 +1072,7 @@ PINST_TRACE_LIST cpthk_get_trace(PCONTROL_FLOW_GRAPH Cfg, TRACE_POINT point, PIN
     size_t bufferSize = 0;
     uintptr_t StartAddress = 0;
     uintptr_t textAddr = 0;
+    PFLOW_GRAPH_NODE node = NULL;
 
     switch (point)
     {
@@ -1046,15 +1113,8 @@ PINST_TRACE_LIST cpthk_get_trace(PCONTROL_FLOW_GRAPH Cfg, TRACE_POINT point, PIN
     case TRACE_POINT_CALLEE:
         return cpthk_get_instr_trace_from_blocks(Cfg->Head, point);
     case TRACE_POINT_RETURN:
-        cpthk_get_text_section(&textAddr, NULL);
 
-        if (textAddr == 0)
-        {
-            return NULL;
-        }
-
-        StartAddress = cpthk_get_n_prev_instrs(textAddr, 10, Cfg->Tail->Address + Cfg->Tail->Size, Cfg->Tail->Address, &bufferSize, false);
-
+        StartAddress = cpthk_get_n_prev_instrs(Cfg->Tail->Address, 10, Cfg->Tail->Address + Cfg->Tail->Size, Cfg->Tail->Address, &bufferSize, false);
         list = cpthk_get_instr_trace((uint8_t *)StartAddress, bufferSize, point);
 
         if (list->Size == 0)
@@ -1064,6 +1124,24 @@ PINST_TRACE_LIST cpthk_get_trace(PCONTROL_FLOW_GRAPH Cfg, TRACE_POINT point, PIN
         }
 
         return list;
+    case TRACE_POINT_RETURN_PREV_BLOCK:
+        // loop all blocks and find at least one block which have Next/Branch or BranchAlt pointing to the tail
+        // if found, get the trace of that block
+        node = Cfg->Head;
+        do
+        {
+            if (node->Branch && node->Branch->Address == Cfg->Tail->Address)
+            {
+                return cpthk_get_instr_trace_from_blocks(node, point);
+            }
+            else if (node->BranchAlt && node->BranchAlt->Address == Cfg->Tail->Address)
+            {
+                return cpthk_get_instr_trace_from_blocks(node, point);
+            }
+            node = node->Next;
+        } while (node->Next);
+        return NULL;
+        break;
     default:
         return NULL;
     }
@@ -1090,14 +1168,38 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
 
     PCALLING_CONVENTION paramCallingConvention = cpthk_emu_traces(list2, &cpu, TEMU_PRIORITIZE_READ_FLAG, TEMU_ANAL_PARAM);
 
+    cpthk_emu_reset_regs(&cpu);
+
+    system("pause");
+
     PINST_TRACE_LIST list3 = cpthk_get_trace(cfg, TRACE_POINT_RETURN, NULL);
-    if (!list3)
+
+    bool retFound = false;
+    PCALLING_CONVENTION returnCallingConvention = NULL;
+
+    if (list3)
     {
-        return NULL;
+        cpthk_print_traces(list3);
+        returnCallingConvention = cpthk_emu_traces(list3, &cpu, TEMU_PRIORITIZE_WRITE_FLAG, TEMU_ANAL_RETURN);
+        if (returnCallingConvention->ReturnRegister != FD_REG_NONE)
+        {
+            retFound = true;
+        }
     }
 
-    cpthk_emu_reset_regs(&cpu);
-    PCALLING_CONVENTION returnCallingConvention = cpthk_emu_traces(list3, &cpu, TEMU_PRIORITIZE_WRITE_FLAG, TEMU_ANAL_RETURN);
+    if (!retFound)
+    {
+        list3 = cpthk_get_trace(cfg, TRACE_POINT_RETURN_PREV_BLOCK, NULL);
+        if (list3)
+        {
+            returnCallingConvention = cpthk_emu_traces(list3, &cpu, TEMU_PRIORITIZE_WRITE_FLAG, TEMU_ANAL_RETURN);
+            if (returnCallingConvention->ReturnRegister != FD_REG_NONE)
+            {
+                retFound = true;
+                returnCallingConvention->ExitHookAddress = cfg->Tail->Address;
+            }
+        }
+    }
 
     paramCallingConvention->ExitHookAddress = returnCallingConvention->ExitHookAddress;
     paramCallingConvention->ReturnRegister = returnCallingConvention->ReturnRegister;

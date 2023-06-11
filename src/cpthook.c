@@ -123,7 +123,6 @@ bool cpthk_write_trampoline(uintptr_t TrampolineAddr, uintptr_t OriginalHook, ui
     // copy the original bytes to the trampoline take care of possible jumps which now are not valid anymore
     size_t trampolineSize = 0;
     size_t writeOffset = 0;
-    size_t readOffset = 0;
     FdInstr instr;
     uint8_t *decodeAddress = originalBytes;
 
@@ -340,7 +339,7 @@ bool cpthk_hook_add_internal(PCONTROL_FLOW_GRAPH Cfg, uintptr_t HookContext, PCA
         }
     }
 
-    if (HookEntry)
+    if (HookEntry && CallingConvention->EntryHookAddress)
     {
         DWORD oldProtect = 0;
         if (!VirtualProtect((void *)Entry->HookContext->HookTrampolineEntry, Entry->OriginalEntrySize, PAGE_EXECUTE_READWRITE, &oldProtect))
@@ -349,7 +348,7 @@ bool cpthk_hook_add_internal(PCONTROL_FLOW_GRAPH Cfg, uintptr_t HookContext, PCA
         }
     }
 
-    if (HookExit)
+    if (HookExit && CallingConvention->ExitHookAddress)
     {
         DWORD oldProtect = 0;
         if (!VirtualProtect((void *)Entry->HookContext->HookTrampolineExit, Entry->OriginalExitSize, PAGE_EXECUTE_READWRITE, &oldProtect))
@@ -401,6 +400,7 @@ CPTHK_STATUS cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC Ex
     if (!cpthk_protect_function(ControlFlowGraph, PAGE_EXECUTE_READWRITE))
     {
         free((void *)Hook);
+        printf("Unable to protect function 1\n");
         return CPTHK_UNABLE_TO_PROTECT_MEMORY;
     }
 
@@ -415,6 +415,7 @@ CPTHK_STATUS cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC Ex
     if (!cpthk_protect_function(ControlFlowGraph, PAGE_EXECUTE_READ))
     {
         free((void *)Hook);
+        printf("Unable to protect function 2\n");
         return CPTHK_UNABLE_TO_PROTECT_MEMORY;
     }
 

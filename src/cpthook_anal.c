@@ -84,7 +84,10 @@ PCONTROL_FLOW_GRAPH cpthk_build_cfg(uintptr_t Address)
     cfg->Tail = NULL;
 
     cpthk_create_node(Address, CFG_ISSTART, NULL, cfg);
-    cfg->Size = (cfg->Tail->Address + cfg->Tail->Size) - cfg->Head->Address;
+    if (!(cfg->Head->Flags & CFG_HAVE_MEM_JMP))
+        cfg->Size = (cfg->Tail->Address + cfg->Tail->Size) - cfg->Head->Address;
+    else
+        cfg->Size = (cfg->Tail->Address + cfg->Tail->Size) - cfg->Head->Branch->Address;
 
     return cfg;
 }
@@ -353,6 +356,25 @@ void cpthk_create_node(uintptr_t Address, CFG_FLAGS Flags, PFLOW_GRAPH_NODE Prev
                 // so break out of the loop
                 break;
             }
+            else if (IS_JMP(instr) && FD_OP_TYPE(&instr, 0) == FD_OT_MEM)
+            {
+                newNode->Flags |= CFG_ISJMP | CFG_HAVE_MEM_JMP;
+                if (FD_OP_BASE(&instr, 0) == FD_REG_IP)
+                {
+                    uintptr_t BranchAddress = Addr + FD_OP_DISP(&instr, 0);
+                    // create a new stack entry
+                    cpthk_push_stack(stack, BranchAddress, CFG_ISMANDATORYBRANCH, newNode, Cfg);
+                    // this is the end of the current node
+                    // so break out of the loop
+                }
+                else
+                {
+                    uintptr_t BranchAddress = *(uintptr_t *)FD_OP_DISP(&instr, 0);
+                    cpthk_push_stack(stack, BranchAddress, CFG_ISMANDATORYBRANCH, newNode, Cfg);
+                }
+
+                break;
+            }
             else if (IS_CONDJMP(instr) && FD_OP_TYPE(&instr, 0) == FD_OT_IMM)
             {
                 newNode->Flags |= CFG_ISCONDJMP;
@@ -494,6 +516,23 @@ PXREFS cpthk_find_xref(uintptr_t Address)
     uintptr_t textSectionAddress = 0;
     size_t textSectionSize = 0;
 
+    size_t sizeOfImage = 0;
+    uintptr_t baseAddress = (uintptr_t)GetModuleHandleA(NULL);
+
+    PIMAGE_DOS_HEADER dosHeader = (PIMAGE_DOS_HEADER)baseAddress;
+    PIMAGE_NT_HEADERS ntHeaders = (PIMAGE_NT_HEADERS)((uintptr_t)dosHeader + dosHeader->e_lfanew);
+    // check if 32 bit or 64 bit
+    if (ntHeaders->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC)
+    {
+        PIMAGE_NT_HEADERS32 ntHeaders32 = (PIMAGE_NT_HEADERS32)ntHeaders;
+        sizeOfImage = ntHeaders32->OptionalHeader.SizeOfImage;
+    }
+    else if (ntHeaders->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC)
+    {
+        PIMAGE_NT_HEADERS64 ntHeaders64 = (PIMAGE_NT_HEADERS64)ntHeaders;
+        sizeOfImage = ntHeaders64->OptionalHeader.SizeOfImage;
+    }
+
     cpthk_get_text_section(&textSectionAddress, &textSectionSize);
 
     for (uintptr_t i = textSectionAddress;;)
@@ -514,7 +553,6 @@ PXREFS cpthk_find_xref(uintptr_t Address)
             i += ret;
 
             FdInstrType iType = FD_TYPE(&instr);
-
             switch (iType)
             {
             case FDI_CALL:
@@ -528,6 +566,44 @@ PXREFS cpthk_find_xref(uintptr_t Address)
                         xrefs->Entries[xrefs->Size - 1].Address = i - ret;
                         xrefs->Entries[xrefs->Size - 1].Type = iType;
                         xrefs->Entries[xrefs->Size - 1].Instr = instr;
+                    }
+                }
+                if (FD_OP_TYPE(&instr, 0) == FD_OT_MEM)
+                {
+                    if (FD_OP_BASE(&instr, 0) == FD_REG_IP && FD_OP_DISP(&instr, 0) != 0)
+                    {
+                        // 64 bit only case
+                        uintptr_t disp = FD_OP_DISP(&instr, 0) + i;
+                        if (disp >= baseAddress && disp <= (baseAddress + sizeOfImage))
+                        {
+                            if (*(uintptr_t *)(disp) == Address)
+                            {
+                                xrefs->Size++;
+                                xrefs->Entries = realloc(xrefs->Entries, sizeof(XREF) * xrefs->Size);
+                                xrefs->Entries[xrefs->Size - 1].Address = i - ret;
+                                xrefs->Entries[xrefs->Size - 1].Type = iType;
+                                xrefs->Entries[xrefs->Size - 1].Instr = instr;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // 32 bit only case
+                        if (FD_OP_BASE(&instr, 0) == FD_REG_NONE && FD_OP_DISP(&instr, 0) != 0)
+                        {
+                            uintptr_t disp = FD_OP_DISP(&instr, 0);
+                            if (disp >= baseAddress && disp <= (baseAddress + sizeOfImage))
+                            {
+                                if (*(uintptr_t *)(disp) == Address)
+                                {
+                                    xrefs->Size++;
+                                    xrefs->Entries = realloc(xrefs->Entries, sizeof(XREF) * xrefs->Size);
+                                    xrefs->Entries[xrefs->Size - 1].Address = i - ret;
+                                    xrefs->Entries[xrefs->Size - 1].Type = iType;
+                                    xrefs->Entries[xrefs->Size - 1].Instr = instr;
+                                }
+                            }
+                        }
                     }
                 }
                 break;

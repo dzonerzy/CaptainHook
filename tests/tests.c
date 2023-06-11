@@ -74,6 +74,17 @@ unsigned int __stdcall test4i(int f1, int f2, int f3, int f4)
     return i;
 }
 
+unsigned long __stack_chk_guard;
+void __stack_chk_guard_setup(void)
+{
+    __stack_chk_guard = 0xBAAAAAAD; // provide some magic numbers
+}
+
+void __stack_chk_fail(void)
+{
+    /* Error message */
+}
+
 void __stdcall entryhook(PCPTHOOK_CTX ctx)
 {
     LOG_INFO("Inside HookEntry", NULL);
@@ -82,7 +93,6 @@ void __stdcall entryhook(PCPTHOOK_CTX ctx)
 void __stdcall exithook(PCPTHOOK_CTX ctx)
 {
     LOG_INFO("Inside HookExit", NULL);
-    ctx->x32.regs[FD_REG_AX] = (unsigned long)(float)1.337f;
 }
 
 int main(int argc, char **argv)
@@ -100,21 +110,13 @@ int main(int argc, char **argv)
     if (status != CPTHK_OK)
     {
         LOG_ERROR("Failed to hook test4i (%s)", cpthk_str_error(status));
+        system("pause");
         return 1;
     }
 
     system("pause");
-
-    printf("res = %f\n", test4f(1.1, 2.2, 3.3, 4.4));
-
-    if (cpthk_unhook((uintptr_t)test4f) != CPTHK_OK)
-    {
-        LOG_ERROR("Failed to unhook test4i", NULL);
-        return 1;
-    }
-
-    printf("res = %f\n", test4f(1.1, 2.2, 3.3, 4.4));
-
+    printf("res = %f\n", test4f(1.0f, 2.0f, 3.0f, 4.0f));
+    system("pause");
     cpthk_uninit();
     return 0;
 }
