@@ -105,18 +105,18 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    CPTHK_STATUS status = cpthk_hook((uintptr_t)test4f, entryhook, exithook);
+    CPTHK_STATUS status = cpthk_hook((uintptr_t)VirtualAlloc, entryhook, exithook);
 
     if (status != CPTHK_OK)
     {
         LOG_ERROR("Failed to hook test4i (%s)", cpthk_str_error(status));
-        system("pause");
         return 1;
     }
 
     system("pause");
-    printf("res = %f\n", test4f(1.0f, 2.0f, 3.0f, 4.0f));
-    system("pause");
+
+    printf("res = %p\n", VirtualAlloc(0, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+
     cpthk_uninit();
     return 0;
 }

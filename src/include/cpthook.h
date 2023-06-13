@@ -12,7 +12,7 @@
 
 #define VERSION_STR(M, m, p, c) M "." m "." p " [" c "]"
 
-#define HOOKSIZE 6
+#define HOOKSIZE 5
 
 typedef struct uint128_t
 {
@@ -63,6 +63,8 @@ typedef struct _HOOK_ENTRY
     size_t OriginalEntrySize;
     uint8_t OriginalExitBytes[HOOKSIZE + 15];
     size_t OriginalExitSize;
+    uintptr_t EntryJumpAddress;
+    uintptr_t ExitJumpAddress;
     PCPTHOOK_CTX HookContext;
 } HOOK_ENTRY, *PHOOK_ENTRY;
 
@@ -80,7 +82,6 @@ typedef struct _JMP_TABLE
     size_t TableCapacity;
 } JMP_TABLE, *PJMP_TABLE;
 
-extern JMP_TABLE JmpTable;
 extern PHOOK_LIST HookList;
 extern bool HookListInitialized;
 

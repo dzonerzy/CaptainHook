@@ -32,4 +32,4 @@ void cpthk_get_text_section(uintptr_t *textSection, size_t *textSize);
 bool cpthk_operate_threads(THREAD_OP Operation);
 bool cpthk_protect_function(PCONTROL_FLOW_GRAPH Cfg, DWORD Protection);
 size_t cpthk_populate_hook_context(uintptr_t HookContext, uintptr_t Address, uintptr_t Trampoline, int mode);
-size_t cpthk_write_jmp(uintptr_t Address, uintptr_t Destination, unsigned char *saveBuffer);
+size_t cpthk_write_ud2(uintptr_t Address, uintptr_t Destination, unsigned char *saveBuffer, bool entry);

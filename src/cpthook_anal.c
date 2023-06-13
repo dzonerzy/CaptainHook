@@ -84,6 +84,7 @@ PCONTROL_FLOW_GRAPH cpthk_build_cfg(uintptr_t Address)
     cfg->Tail = NULL;
 
     cpthk_create_node(Address, CFG_ISSTART, NULL, cfg);
+
     if (!(cfg->Head->Flags & CFG_HAVE_MEM_JMP))
         cfg->Size = (cfg->Tail->Address + cfg->Tail->Size) - cfg->Head->Address;
     else
@@ -210,6 +211,14 @@ void cpthk_create_node(uintptr_t Address, CFG_FLAGS Flags, PFLOW_GRAPH_NODE Prev
             {
                 entry->Prev->Branch = newNode;
             }
+
+            if (entry->Flags & CFG_ISFALLTHROUGH)
+            {
+                entry->Prev->BranchAlt = newNode;
+            }
+
+            newNode->Flags |= entry->Flags;
+
             continue;
         }
 
@@ -339,6 +348,7 @@ void cpthk_create_node(uintptr_t Address, CFG_FLAGS Flags, PFLOW_GRAPH_NODE Prev
             int ret = fd_decode((uint8_t *)Addr, 15, FD_MODE, Addr, &instr);
             if (ret < 0)
             {
+                printf("fd_decode failed with %d\n", ret);
                 cpthk_free_stack(stack);
                 return;
             }
@@ -356,14 +366,30 @@ void cpthk_create_node(uintptr_t Address, CFG_FLAGS Flags, PFLOW_GRAPH_NODE Prev
                 // so break out of the loop
                 break;
             }
+            else if (IS_CONDJMP(instr) && FD_OP_TYPE(&instr, 0) == FD_OT_IMM)
+            {
+                newNode->Flags |= CFG_ISCONDJMP;
+                uintptr_t BranchAddress = FD_OP_IMM(&instr, 0);
+                uintptr_t FallthroughAddress = Addr;
+                printf("BranchAddress: %p cur: %p\n", (void *)BranchAddress, newNode->Address);
+                printf("FallthroughAddress: %p cur: %p\n", (void *)FallthroughAddress, newNode->Address);
+                // create 2 new stack entries
+                // first one is the branch address
+                // second one is the fallthrough address
+                cpthk_push_stack(stack, FallthroughAddress, CFG_ISFALLTHROUGH, newNode, Cfg);
+                cpthk_push_stack(stack, BranchAddress, CFG_ISBRANCH, newNode, Cfg);
+                // this is the end of the current node
+                // so break out of the loop
+                break;
+            }
             else if (IS_JMP(instr) && FD_OP_TYPE(&instr, 0) == FD_OT_MEM)
             {
                 newNode->Flags |= CFG_ISJMP | CFG_HAVE_MEM_JMP;
                 if (FD_OP_BASE(&instr, 0) == FD_REG_IP)
                 {
-                    uintptr_t BranchAddress = Addr + FD_OP_DISP(&instr, 0);
+                    uintptr_t *BranchAddress = (uintptr_t *)(Addr + FD_OP_DISP(&instr, 0));
                     // create a new stack entry
-                    cpthk_push_stack(stack, BranchAddress, CFG_ISMANDATORYBRANCH, newNode, Cfg);
+                    cpthk_push_stack(stack, *BranchAddress, CFG_ISMANDATORYBRANCH, newNode, Cfg);
                     // this is the end of the current node
                     // so break out of the loop
                 }
@@ -373,21 +399,6 @@ void cpthk_create_node(uintptr_t Address, CFG_FLAGS Flags, PFLOW_GRAPH_NODE Prev
                     cpthk_push_stack(stack, BranchAddress, CFG_ISMANDATORYBRANCH, newNode, Cfg);
                 }
 
-                break;
-            }
-            else if (IS_CONDJMP(instr) && FD_OP_TYPE(&instr, 0) == FD_OT_IMM)
-            {
-                newNode->Flags |= CFG_ISCONDJMP;
-                uintptr_t BranchAddress = FD_OP_IMM(&instr, 0);
-                uintptr_t FallthroughAddress = Addr;
-
-                // create 2 new stack entries
-                // first one is the branch address
-                // second one is the fallthrough address
-                cpthk_push_stack(stack, FallthroughAddress, CFG_ISFALLTHROUGH, newNode, Cfg);
-                cpthk_push_stack(stack, BranchAddress, CFG_ISBRANCH, newNode, Cfg);
-                // this is the end of the current node
-                // so break out of the loop
                 break;
             }
             else if (IS_RET(instr))
@@ -432,32 +443,64 @@ void cpthk_dump_node(PFLOW_GRAPH_NODE Node)
     {
         return;
     }
-    printf("--------------------\n");
-    printf("Address: 0x%x\n", Node->Address);
-    printf("Prev: 0x%x\n", Node->Prev ? Node->Prev->Address : 0);
-    printf("Next: 0x%x\n", Node->Next ? Node->Next->Address : 0);
-    printf("End: 0x%lx\n", Node->Address + Node->Size);
-    printf("Size: %lu\n", Node->Size);
-    printf("Flags: %lu\n", Node->Flags);
-    if (Node->Branch)
-        printf("Branch: 0x%llx\n", Node->Branch->Address);
-    if (Node->BranchAlt)
-        printf("BranchAlt: 0x%llx\n", Node->BranchAlt->Address);
-    for (uintptr_t i = Node->Address; i < (unsigned long long)Node->Address + Node->Size;)
+    if (FD_MODE == 32)
     {
-        FdInstr instr;
-        int ret = fd_decode((uint8_t *)i, 15, FD_MODE, i, &instr);
-        if (ret < 0)
+        printf("--------------------\n");
+        printf("Address: 0x%x\n", Node->Address);
+        printf("Prev: 0x%x\n", Node->Prev ? Node->Prev->Address : 0);
+        printf("Next: 0x%x\n", Node->Next ? Node->Next->Address : 0);
+        printf("End: 0x%lx\n", Node->Address + Node->Size);
+        printf("Size: %lu\n", Node->Size);
+        printf("Flags: %lu\n", Node->Flags);
+        if (Node->Branch)
+            printf("Branch: 0x%llx\n", Node->Branch->Address);
+        if (Node->BranchAlt)
+            printf("BranchAlt: 0x%llx\n", Node->BranchAlt->Address);
+        for (uintptr_t i = Node->Address; i < (unsigned long long)Node->Address + Node->Size;)
         {
-            printf("fd_decode failed\n");
-            return;
+            FdInstr instr;
+            int ret = fd_decode((uint8_t *)i, 15, FD_MODE, i, &instr);
+            if (ret < 0)
+            {
+                printf("fd_decode failed\n");
+                return;
+            }
+            char buf[256];
+            fd_format(&instr, buf, sizeof(buf));
+            printf("0x%x: %s\n", i, buf);
+            i += ret;
         }
-        char buf[256];
-        fd_format(&instr, buf, sizeof(buf));
-        printf("0x%x: %s\n", i, buf);
-        i += ret;
+        printf("--------------------\n");
     }
-    printf("--------------------\n");
+    else
+    {
+        printf("--------------------\n");
+        printf("Address: 0x%llx\n", Node->Address);
+        printf("Prev: 0x%llx\n", Node->Prev ? Node->Prev->Address : 0);
+        printf("Next: 0x%llx\n", Node->Next ? Node->Next->Address : 0);
+        printf("End: 0x%llx\n", Node->Address + Node->Size);
+        printf("Size: %llu\n", Node->Size);
+        printf("Flags: %llu\n", Node->Flags);
+        if (Node->Branch)
+            printf("Branch: 0x%llx\n", Node->Branch->Address);
+        if (Node->BranchAlt)
+            printf("BranchAlt: 0x%llx\n", Node->BranchAlt->Address);
+        for (uintptr_t i = Node->Address; i < (unsigned long long)Node->Address + Node->Size;)
+        {
+            FdInstr instr;
+            int ret = fd_decode((uint8_t *)i, 15, FD_MODE, i, &instr);
+            if (ret < 0)
+            {
+                printf("fd_decode failed\n");
+                return;
+            }
+            char buf[256];
+            fd_format(&instr, buf, sizeof(buf));
+            printf("0x%llx: %s\n", i, buf);
+            i += ret;
+        }
+        printf("--------------------\n");
+    }
 }
 
 void cpthk_free_node(PFLOW_GRAPH_NODE Node)

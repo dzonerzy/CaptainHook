@@ -2,7 +2,25 @@
 
 PHOOK_LIST HookList = NULL;
 bool HookListInitialized = false;
-JMP_TABLE JmpTable = {0};
+
+ULONGLONG cpthk_veh(EXCEPTION_POINTERS *Info)
+{
+    if (Info->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION)
+    {
+        uintptr_t EAddr = (uintptr_t)Info->ExceptionRecord->ExceptionAddress;
+        unsigned short index = *(unsigned short *)(EAddr + 2);
+        unsigned char isEntry = *(unsigned char *)(EAddr + 4);
+        PHOOK_ENTRY entry = &HookList->Entries[index];
+
+        if (isEntry)
+            Info->ContextRecord->Rip = entry->EntryJumpAddress;
+        else
+            Info->ContextRecord->Rip = entry->ExitJumpAddress;
+
+        return EXCEPTION_CONTINUE_EXECUTION;
+    }
+    return EXCEPTION_CONTINUE_SEARCH;
+}
 
 CPTHK_STATUS cpthk_init(void)
 {
@@ -21,53 +39,12 @@ CPTHK_STATUS cpthk_init(void)
 
     memset(HookList->Entries, 0, HookList->Size * sizeof(HOOK_ENTRY));
 
-    HookListInitialized = true;
-
-    if (FD_MODE == 64)
+    if (!AddVectoredExceptionHandler(1, (PVECTORED_EXCEPTION_HANDLER)cpthk_veh))
     {
-
-        MEMORY_BASIC_INFORMATION mbi;
-
-        if (VirtualQuery(GetModuleHandleA(NULL), &mbi, sizeof(MEMORY_BASIC_INFORMATION)) == 0)
-        {
-            return false;
-        }
-
-        // get page size
-        uintptr_t pageSize = 0x1000;
-        uintptr_t moduleBase = (uintptr_t)mbi.AllocationBase;
-        uintptr_t moduleEnd = moduleBase + mbi.RegionSize;
-        uintptr_t tableEntry = moduleEnd - 0x5000;
-        // align tableEntry to next PAGE_SIZE
-        tableEntry = (tableEntry + pageSize - 1) & ~(pageSize - 1);
-
-        if (VirtualQuery((void *)tableEntry, &mbi, sizeof(MEMORY_BASIC_INFORMATION)) == 0)
-        {
-            return CPTHK_UNABLE_TO_QUERY_MEMORY;
-        }
-
-        // check if the table is free
-        if (mbi.State != MEM_FREE)
-        {
-            return false;
-        }
-
-        // allocate the table
-        uintptr_t TableAddr = (uintptr_t)VirtualAlloc((void *)tableEntry, 0x2000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-        if (!TableAddr)
-        {
-            return CPTHK_OUT_OF_MEMORY;
-        }
-
-        // initialize the table
-        memset((void *)TableAddr, 0, 0x2000);
-
-        // set the table entry
-        JmpTable.TableEntry = (uintptr_t *)TableAddr;
-        JmpTable.TableCapacity = 0x2000 / sizeof(uintptr_t);
-        JmpTable.TableCount = 0;
+        return CPTHK_ERROR;
     }
 
+    HookListInitialized = true;
     return CPTHK_OK;
 }
 
@@ -91,15 +68,6 @@ CPTHK_STATUS cpthk_uninit(void)
     free((void *)HookList);
     HookList = NULL;
     HookListInitialized = false;
-
-    if (FD_MODE == 64)
-    {
-        if (JmpTable.TableEntry)
-        {
-            VirtualFree((void *)JmpTable.TableEntry, 0, MEM_RELEASE);
-            JmpTable.TableEntry = NULL;
-        }
-    }
 
     return CPTHK_OK;
 }
@@ -210,7 +178,7 @@ bool cpthk_write_trampoline(uintptr_t TrampolineAddr, uintptr_t OriginalHook, ui
     return true;
 }
 
-void cpthk_restore_jmps(uintptr_t Address, uint8_t *Buffer, size_t OldBufSize)
+void cpthk_restore(uintptr_t Address, uint8_t *Buffer, size_t OldBufSize)
 {
     memcpy((void *)Address, Buffer, OldBufSize);
 }
@@ -250,9 +218,10 @@ bool cpthk_hook_add_internal(PCONTROL_FLOW_GRAPH Cfg, uintptr_t HookContext, PCA
 
     if (HookEntry && CallingConvention->EntryHookAddress)
     {
+        Entry->EntryJumpAddress = HookContext + sizeof(CPTHOOK_CTX);
         // write the jmp to the entry hook
         unsigned char originalEntryBytes[HOOKSIZE + 15];
-        size_t entryReplacedBytesSize = cpthk_write_jmp(CallingConvention->EntryHookAddress, HookContext + sizeof(CPTHOOK_CTX), (unsigned char *)&originalEntryBytes);
+        size_t entryReplacedBytesSize = cpthk_write_ud2(CallingConvention->EntryHookAddress, HookContext + sizeof(CPTHOOK_CTX), (unsigned char *)&originalEntryBytes, true);
 
         if (entryReplacedBytesSize == 0)
         {
@@ -268,7 +237,7 @@ bool cpthk_hook_add_internal(PCONTROL_FLOW_GRAPH Cfg, uintptr_t HookContext, PCA
 
         if (!Entry->HookContext->HookTrampolineEntry)
         {
-            cpthk_restore_jmps(CallingConvention->EntryHookAddress, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
+            cpthk_restore(CallingConvention->EntryHookAddress, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
             return false;
         }
         else
@@ -279,7 +248,7 @@ bool cpthk_hook_add_internal(PCONTROL_FLOW_GRAPH Cfg, uintptr_t HookContext, PCA
         // Write the trampoline
         if (!cpthk_write_trampoline(Entry->HookContext->HookTrampolineEntry, CallingConvention->EntryHookAddress, originalEntryBytes, entryReplacedBytesSize))
         {
-            cpthk_restore_jmps(CallingConvention->EntryHookAddress, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
+            cpthk_restore(CallingConvention->EntryHookAddress, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
             free((void *)Entry->HookContext->HookTrampolineEntry);
             return false;
         }
@@ -288,17 +257,17 @@ bool cpthk_hook_add_internal(PCONTROL_FLOW_GRAPH Cfg, uintptr_t HookContext, PCA
         stubSize = cpthk_populate_hook_context(HookContext, HookContext + sizeof(CPTHOOK_CTX), Entry->HookContext->HookTrampolineEntry, FD_MODE);
         if (stubSize == 0)
         {
-            cpthk_restore_jmps(CallingConvention->EntryHookAddress, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
+            cpthk_restore(CallingConvention->EntryHookAddress, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
             return false;
         }
     }
 
     if (HookExit && CallingConvention->ExitHookAddress)
     {
-
+        Entry->ExitJumpAddress = HookContext + sizeof(CPTHOOK_CTX) + stubSize;
         // do the same for the exit hook
         unsigned char originalExitBytes[HOOKSIZE + 15];
-        size_t exitReplacedBytesSize = cpthk_write_jmp(CallingConvention->ExitHookAddress, HookContext + sizeof(CPTHOOK_CTX) + stubSize, (unsigned char *)&originalExitBytes);
+        size_t exitReplacedBytesSize = cpthk_write_ud2(CallingConvention->ExitHookAddress, HookContext + sizeof(CPTHOOK_CTX) + stubSize, (unsigned char *)&originalExitBytes, false);
 
         if (exitReplacedBytesSize == 0)
         {
@@ -313,7 +282,7 @@ bool cpthk_hook_add_internal(PCONTROL_FLOW_GRAPH Cfg, uintptr_t HookContext, PCA
         Entry->HookContext->HookTrampolineExit = (uintptr_t)malloc(exitReplacedBytesSize + (15 * 6));
         if (!Entry->HookContext->HookTrampolineExit)
         {
-            cpthk_restore_jmps(CallingConvention->ExitHookAddress, Entry->OriginalExitBytes, Entry->OriginalExitSize);
+            cpthk_restore(CallingConvention->ExitHookAddress, Entry->OriginalExitBytes, Entry->OriginalExitSize);
             free((void *)Entry->HookContext->HookTrampolineEntry);
             return false;
         }
@@ -325,7 +294,7 @@ bool cpthk_hook_add_internal(PCONTROL_FLOW_GRAPH Cfg, uintptr_t HookContext, PCA
         // Write the trampoline
         if (!cpthk_write_trampoline(Entry->HookContext->HookTrampolineExit, CallingConvention->ExitHookAddress, originalExitBytes, exitReplacedBytesSize))
         {
-            cpthk_restore_jmps(CallingConvention->ExitHookAddress, Entry->OriginalExitBytes, Entry->OriginalExitSize);
+            cpthk_restore(CallingConvention->ExitHookAddress, Entry->OriginalExitBytes, Entry->OriginalExitSize);
             free((void *)Entry->HookContext->HookTrampolineExit);
             return false;
         }
@@ -334,7 +303,7 @@ bool cpthk_hook_add_internal(PCONTROL_FLOW_GRAPH Cfg, uintptr_t HookContext, PCA
         stubSize = cpthk_populate_hook_context(HookContext, HookContext + sizeof(CPTHOOK_CTX) + stubSize, Entry->HookContext->HookTrampolineExit, FD_MODE);
         if (stubSize == 0)
         {
-            cpthk_restore_jmps(CallingConvention->ExitHookAddress, Entry->OriginalExitBytes, Entry->OriginalExitSize);
+            cpthk_restore(CallingConvention->ExitHookAddress, Entry->OriginalExitBytes, Entry->OriginalExitSize);
             return false;
         }
     }
@@ -455,8 +424,8 @@ CPTHK_STATUS cpthk_unhook(uintptr_t FunctionAddress)
             }
 
             // restore the original bytes
-            cpthk_restore_jmps(Entry->HookContext->CallingConvention->EntryHookAddress, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
-            cpthk_restore_jmps(Entry->HookContext->CallingConvention->ExitHookAddress, Entry->OriginalExitBytes, Entry->OriginalExitSize);
+            cpthk_restore(Entry->HookContext->CallingConvention->EntryHookAddress, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
+            cpthk_restore(Entry->HookContext->CallingConvention->ExitHookAddress, Entry->OriginalExitBytes, Entry->OriginalExitSize);
 
             // restore the protection
             if (!VirtualProtect((void *)Entry->FunctionAddress, Entry->FunctionSize, PAGE_EXECUTE_READ, &oldProtect))

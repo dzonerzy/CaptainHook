@@ -1100,15 +1100,16 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
             cc->EntryHookAddress = logger.TraceLog[0].Trace.Address;
         }
 
-        // reorder the arguments based on logger.TraceLog[i].Timestamp
+        // reorder the arguments based on FdReg value
         for (size_t i = 0; i < logger.TraceCount; i++)
         {
             for (size_t j = 0; j < logger.TraceCount; j++)
             {
-                if (FD_MODE == 64)
+
+                // from smaller to bigger
+                if (logger.TraceLog[i].Trace.Rt == TRACE_REG && logger.TraceLog[j].Trace.Rt == TRACE_REG)
                 {
-                    // from the oldest to the newest
-                    if (logger.TraceLog[i].Timestamp < logger.TraceLog[j].Timestamp)
+                    if (logger.TraceLog[i].Trace.RValue.RegValue.RegValue < logger.TraceLog[j].Trace.RValue.RegValue.RegValue)
                     {
                         // swap
                         TRACE_LOG tmp = logger.TraceLog[i];
@@ -1116,11 +1117,9 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
                         logger.TraceLog[j] = tmp;
                     }
                 }
-                else
+                else if (logger.TraceLog[i].Trace.Rt == TRACE_OFFSET && logger.TraceLog[j].Trace.Rt == TRACE_OFFSET)
                 {
-                    // on 32 bit parameters are pushed on the stack in reverse order
-                    // from the newest to the oldest
-                    if (logger.TraceLog[i].Timestamp > logger.TraceLog[j].Timestamp)
+                    if (logger.TraceLog[i].Trace.RValue.OffsetValue.Offset < logger.TraceLog[j].Trace.RValue.OffsetValue.Offset)
                     {
                         // swap
                         TRACE_LOG tmp = logger.TraceLog[i];

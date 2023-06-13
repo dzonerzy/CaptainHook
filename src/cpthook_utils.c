@@ -241,7 +241,7 @@ bool cpthk_protect_function(PCONTROL_FLOW_GRAPH Cfg, DWORD Protection)
     return true;
 }
 
-size_t cpthk_write_jmp(uintptr_t Address, uintptr_t Destination, unsigned char *saveBuffer)
+size_t cpthk_write_ud2(uintptr_t Address, uintptr_t Destination, unsigned char *saveBuffer, bool entry)
 {
     // decode instruction at Address and write a jmp to Destination
     // take care of overlapping instructions and such
@@ -249,7 +249,7 @@ size_t cpthk_write_jmp(uintptr_t Address, uintptr_t Destination, unsigned char *
     // so we can just write the jmp
 
     int size = 0;
-    int limitSize = FD_MODE == 32 ? 5 : 6;
+    int limitSize = 5;
     uintptr_t startAddress = Address;
     do
     {
@@ -267,22 +267,10 @@ size_t cpthk_write_jmp(uintptr_t Address, uintptr_t Destination, unsigned char *
         }
     } while (size < limitSize);
 
-    switch (FD_MODE)
-    {
-    case 32:
-        JMP_RELATIVE32(Address, Destination);
-        memset((void *)(Address + 5), 0x90, size - limitSize);
-        JmpTable.TableCount++;
-        break;
-    case 64:
-        JmpTable.TableEntry[JmpTable.TableCount] = Destination;
-        JMP_RELATIVE64(Address, &JmpTable.TableEntry[JmpTable.TableCount]);
-        memset((void *)(Address + limitSize), 0x90, size - limitSize);
-        JmpTable.TableCount++;
-        break;
-    default:
-        return -1;
-    }
+    *(unsigned short *)(Address) = 0x0b0f;
+    *(unsigned short *)(Address + 2) = HookList->Count - 1;
+    *(unsigned char *)(Address + 4) = entry ? 1 : 0;
+    memset((void *)(Address + limitSize), 0x90, size - limitSize);
 
     return size;
 }
