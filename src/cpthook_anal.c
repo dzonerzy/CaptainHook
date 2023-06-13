@@ -348,7 +348,6 @@ void cpthk_create_node(uintptr_t Address, CFG_FLAGS Flags, PFLOW_GRAPH_NODE Prev
             int ret = fd_decode((uint8_t *)Addr, 15, FD_MODE, Addr, &instr);
             if (ret < 0)
             {
-                printf("fd_decode failed with %d\n", ret);
                 cpthk_free_stack(stack);
                 return;
             }
@@ -371,8 +370,6 @@ void cpthk_create_node(uintptr_t Address, CFG_FLAGS Flags, PFLOW_GRAPH_NODE Prev
                 newNode->Flags |= CFG_ISCONDJMP;
                 uintptr_t BranchAddress = FD_OP_IMM(&instr, 0);
                 uintptr_t FallthroughAddress = Addr;
-                printf("BranchAddress: %p cur: %p\n", (void *)BranchAddress, newNode->Address);
-                printf("FallthroughAddress: %p cur: %p\n", (void *)FallthroughAddress, newNode->Address);
                 // create 2 new stack entries
                 // first one is the branch address
                 // second one is the fallthrough address

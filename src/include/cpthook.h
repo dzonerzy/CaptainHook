@@ -23,30 +23,10 @@ typedef struct uint128_t
 #pragma pack(push, 1)
 typedef struct _CPTHOOK_CTX
 {
+    PCONTEXT CpuContext;
     PCALLING_CONVENTION CallingConvention;
-    union
-    {
-        struct
-        {
-            unsigned char grp[128];
-            unsigned char xmm[256];
-        } regs;
-
-        struct
-        {
-            unsigned long long regs[16];
-            uint128_t xmm[16];
-        } x64;
-
-        struct
-        {
-            unsigned long regs[8];
-            uint128_t xmm[8];
-        } x32;
-    };
-
-    uintptr_t EntryHook;
-    uintptr_t ExitHook;
+    void(__stdcall *EntryHook)(struct _CPTHOOK_CTX *Context);
+    void(__stdcall *ExitHook)(struct _CPTHOOK_CTX *Context);
     uintptr_t HookTrampolineEntry;
     uintptr_t HookTrampolineExit;
 } CPTHOOK_CTX, *PCPTHOOK_CTX;
@@ -63,9 +43,8 @@ typedef struct _HOOK_ENTRY
     size_t OriginalEntrySize;
     uint8_t OriginalExitBytes[HOOKSIZE + 15];
     size_t OriginalExitSize;
-    uintptr_t EntryJumpAddress;
-    uintptr_t ExitJumpAddress;
     PCPTHOOK_CTX HookContext;
+    PCONTROL_FLOW_GRAPH Cfg;
 } HOOK_ENTRY, *PHOOK_ENTRY;
 
 typedef struct _HOOK_LIST

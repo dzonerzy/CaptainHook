@@ -93,6 +93,7 @@ void __stdcall entryhook(PCPTHOOK_CTX ctx)
 void __stdcall exithook(PCPTHOOK_CTX ctx)
 {
     LOG_INFO("Inside HookExit", NULL);
+    ctx->CpuContext->Rax = 0x1337;
 }
 
 int main(int argc, char **argv)
@@ -114,6 +115,14 @@ int main(int argc, char **argv)
     }
 
     system("pause");
+
+    printf("res = %p\n", VirtualAlloc(0, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+
+    if (cpthk_unhook((uintptr_t)VirtualAlloc) != CPTHK_OK)
+    {
+        LOG_ERROR("Failed to unhook test4i (%s)", cpthk_str_error(status));
+        return 1;
+    }
 
     printf("res = %p\n", VirtualAlloc(0, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
 

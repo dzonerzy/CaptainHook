@@ -136,90 +136,6 @@ bool cpthk_operate_threads(THREAD_OP Operation)
     return true;
 }
 
-size_t cpthk_populate_hook_context(uintptr_t HookContext, uintptr_t Address, uintptr_t Trampoline, int mode)
-{
-    if (!Address)
-        return 0;
-
-    if (mode == 32)
-    {
-        size_t stubSize = stub_size;
-        memcpy((void *)Address, (void *)stub, stubSize);
-
-        uintptr_t trampolineAddr = (uintptr_t)cpthk_find_pattern((uint8_t *)Address, stubSize, "90 90 90 90 90");
-        if (trampolineAddr)
-        {
-            JMP_RELATIVE32(trampolineAddr, Trampoline);
-        }
-        else
-            return 0;
-
-        signed int *firstOffset = (signed int *)cpthk_find_pattern((uint8_t *)Address, stubSize, "1D 1C 1B 1A");
-        signed int *secondOffset = (signed int *)cpthk_find_pattern((uint8_t *)Address, stubSize, "2D 2C 2B 2A");
-
-        if (!firstOffset)
-            return 0;
-
-        if (!secondOffset)
-            return 0;
-
-        *firstOffset = (signed int)(((uintptr_t)firstOffset - HookContext - 3) * -1);
-        *secondOffset = (signed int)(((uintptr_t)secondOffset - HookContext - 3) * -1);
-
-        PCPTHOOK_CTX ctx = (PCPTHOOK_CTX)HookContext;
-
-        DWORD offset = Trampoline == ctx->HookTrampolineEntry ? 0x180 : 0x184;
-
-        DWORD *hookOffset = (DWORD *)cpthk_find_pattern((uint8_t *)Address, stubSize, "44 33 22 11");
-
-        if (hookOffset)
-            *hookOffset = offset;
-        else
-            return 0;
-
-        // TODO: remove this when 32 bit hooking is implemented
-        return stubSize;
-    }
-    else if (mode == 64)
-    {
-        size_t stubSize = stub_size;
-        memcpy((void *)Address, (void *)stub, stubSize);
-
-        uintptr_t *trampolineAddr = (uintptr_t *)cpthk_find_pattern((uint8_t *)Address, stubSize, "90 90 90 90 90 90 90 90");
-        if (trampolineAddr)
-            *trampolineAddr = Trampoline;
-        else
-            return 0;
-
-        signed int *firstOffset = (signed int *)cpthk_find_pattern((uint8_t *)Address, stubSize, "1D 1C 1B 1A");
-        signed int *secondOffset = (signed int *)cpthk_find_pattern((uint8_t *)Address, stubSize, "2D 2C 2B 2A");
-
-        if (!firstOffset)
-            return 0;
-
-        if (!secondOffset)
-            return 0;
-
-        *firstOffset = (signed int)(((uintptr_t)firstOffset - HookContext - 4) * -1);
-        *secondOffset = (signed int)(((uintptr_t)secondOffset - HookContext - 4) * -1);
-
-        PCPTHOOK_CTX ctx = (PCPTHOOK_CTX)HookContext;
-
-        DWORD offset = Trampoline == ctx->HookTrampolineEntry ? 0x180 : 0x188;
-
-        DWORD *hookOffset = (DWORD *)cpthk_find_pattern((uint8_t *)Address, stubSize, "44 33 22 11");
-
-        if (hookOffset)
-            *hookOffset = offset;
-        else
-            return 0;
-
-        return stubSize;
-    }
-
-    return 0;
-}
-
 bool cpthk_protect_function(PCONTROL_FLOW_GRAPH Cfg, DWORD Protection)
 {
     if (!Cfg)
@@ -241,7 +157,7 @@ bool cpthk_protect_function(PCONTROL_FLOW_GRAPH Cfg, DWORD Protection)
     return true;
 }
 
-size_t cpthk_write_ud2(uintptr_t Address, uintptr_t Destination, unsigned char *saveBuffer, bool entry)
+size_t cpthk_write_ud2(uintptr_t Address, unsigned char *saveBuffer, bool entry)
 {
     // decode instruction at Address and write a jmp to Destination
     // take care of overlapping instructions and such

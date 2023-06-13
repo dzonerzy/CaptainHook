@@ -2,9 +2,6 @@
 #include <cpthook.h>
 #include <tlhelp32.h>
 
-extern unsigned char stub[];
-extern unsigned long stub_size;
-
 typedef enum _THREAD_OP
 {
     THREAD_OP_SUSPEND,
@@ -31,5 +28,4 @@ uintptr_t cpthk_find_pattern(uint8_t *pBuffer, DWORD dwBufferSize, const char *p
 void cpthk_get_text_section(uintptr_t *textSection, size_t *textSize);
 bool cpthk_operate_threads(THREAD_OP Operation);
 bool cpthk_protect_function(PCONTROL_FLOW_GRAPH Cfg, DWORD Protection);
-size_t cpthk_populate_hook_context(uintptr_t HookContext, uintptr_t Address, uintptr_t Trampoline, int mode);
-size_t cpthk_write_ud2(uintptr_t Address, uintptr_t Destination, unsigned char *saveBuffer, bool entry);
+size_t cpthk_write_ud2(uintptr_t Address, unsigned char *saveBuffer, bool entry);

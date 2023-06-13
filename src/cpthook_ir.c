@@ -1170,8 +1170,6 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
 
     cpthk_emu_reset_regs(&cpu);
 
-    system("pause");
-
     PINST_TRACE_LIST list3 = cpthk_get_trace(cfg, TRACE_POINT_RETURN, NULL);
 
     bool retFound = false;
@@ -1179,7 +1177,6 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
 
     if (list3)
     {
-        cpthk_print_traces(list3);
         returnCallingConvention = cpthk_emu_traces(list3, &cpu, TEMU_PRIORITIZE_WRITE_FLAG, TEMU_ANAL_RETURN);
         if (returnCallingConvention->ReturnRegister != FD_REG_NONE)
         {

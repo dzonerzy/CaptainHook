@@ -16,17 +16,6 @@ foreach source : raw_sources
   sources += 'src/' + source
 endforeach
 
-asm_source = []
-asm_flags = []
-
-if get_option('arch') == '32'
-  asm_source += 'src/cpthook_x86.asm'
-  asm_flags += '-x86'
-else
-  asm_source += 'src/cpthook_x64.asm'
-  asm_flags += '-x86_64'
-endif
-
 subdir('fadec')
 
 sources += fadec_sources

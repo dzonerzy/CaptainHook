@@ -39,19 +39,8 @@ if get_option('tests')
   subdir('tests')
 endif
 
-
-stub = []
-
-stub += custom_target('cpthook_stub',
-  command: [python3, '@INPUT0@',  '-input', '@INPUT1@'] + asm_flags + ['-nasm', nasm],
-  input: files('asmcompile.py', asm_source),
-  output: ['cpthook_stub.c'],
-  install: true,
-  install_dir: [false]
-)
-
 libcpthook = static_library('cpthook', 
-  sources + stub,
+  sources,
   include_directories: cpthook_inc_dirs,
   # cflags 
   c_args: [
