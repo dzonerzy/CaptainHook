@@ -39,7 +39,7 @@ typedef struct _CALLING_CONVENTION
     uintptr_t ExitHookAddress;
     ARGUMENT Arguments[16];
     size_t ArgumentsCount;
-    FdReg ReturnRegister;
+    ARGUMENT ReturnArg;
 } CALLING_CONVENTION, *PCALLING_CONVENTION;
 
 typedef enum _TRACE_OP_TYPE

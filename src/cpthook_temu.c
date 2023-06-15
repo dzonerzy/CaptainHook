@@ -931,7 +931,12 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
     PCALLING_CONVENTION cc = malloc(sizeof(CALLING_CONVENTION));
     memset(cc, 0, sizeof(CALLING_CONVENTION));
 
-    cc->ReturnRegister = FD_REG_NONE;
+    cc->ReturnArg.Position.Reg = FD_REG_NONE;
+    cc->ReturnArg.Position.Offset = 0;
+    cc->ReturnArg.Gpr = 0;
+    cc->ReturnArg.Fpu = 0;
+    cc->ReturnArg.Vec = 0;
+    cc->ReturnArg.Stack = 0;
 
     TEMU_TRACE_LOGGER logger;
     memset(&logger, 0, sizeof(TEMU_TRACE_LOGGER));
@@ -1181,7 +1186,31 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
             {
                 if (logger.TraceLog[i].Trace.Lt == TRACE_REG && (logger.TraceLog[i].Trace.LValue.RegValue.RegValue != FD_REG_SP && logger.TraceLog[i].Trace.LValue.RegValue.RegValue != FD_REG_BP))
                 {
-                    cc->ReturnRegister = logger.TraceLog[i].Trace.LValue.RegValue.RegValue;
+                    cc->ReturnArg.Position.Reg = logger.TraceLog[i].Trace.LValue.RegValue.RegValue;
+                    cc->ReturnArg.Position.Offset = 0;
+                    cc->ReturnArg.Gpr = logger.TraceLog[i].Trace.LValue.RegValue.gpr ? true : false;
+                    cc->ReturnArg.Fpu = logger.TraceLog[i].Trace.LValue.RegValue.fpu ? true : false;
+                    cc->ReturnArg.Vec = logger.TraceLog[i].Trace.LValue.RegValue.vec ? true : false;
+                    cc->ReturnArg.Instruction = logger.TraceLog[i].Trace.Instr;
+                    cc->ReturnArg.Used = true;
+                    cc->ReturnArg.Size = FD_SIZE(&logger.TraceLog[i].Trace.Instr);
+                    cc->ReturnArg.Type = ARG_TYPE_INT;
+                    cc->ReturnArg.Stack = false;
+                    cc->ExitHookAddress = logger.TraceLog[i].Trace.Address + FD_SIZE(&logger.TraceLog[i].Trace.Instr);
+                    break;
+                }
+                else if (logger.TraceLog[i].Trace.Lt == TRACE_OFFSET)
+                {
+                    cc->ReturnArg.Position.Reg = logger.TraceLog[i].Trace.LValue.OffsetValue.Reg;
+                    cc->ReturnArg.Position.Offset = logger.TraceLog[i].Trace.LValue.OffsetValue.Offset;
+                    cc->ReturnArg.Gpr = false;
+                    cc->ReturnArg.Fpu = false;
+                    cc->ReturnArg.Vec = false;
+                    cc->ReturnArg.Instruction = logger.TraceLog[i].Trace.Instr;
+                    cc->ReturnArg.Used = true;
+                    cc->ReturnArg.Size = FD_SIZE(&logger.TraceLog[i].Trace.Instr);
+                    cc->ReturnArg.Type = ARG_TYPE_INT;
+                    cc->ReturnArg.Stack = true;
                     cc->ExitHookAddress = logger.TraceLog[i].Trace.Address + FD_SIZE(&logger.TraceLog[i].Trace.Instr);
                     break;
                 }
@@ -1189,7 +1218,8 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
         }
         else
         {
-            cc->ReturnRegister = FD_REG_NONE;
+            cc->ReturnArg.Used = false;
+            cc->ReturnArg.Position.Reg = FD_REG_NONE;
             cc->ExitHookAddress = 0;
         }
         break;

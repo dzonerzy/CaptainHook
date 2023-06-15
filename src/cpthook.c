@@ -36,6 +36,271 @@ ULONGLONG WINAPI cpthk_veh(EXCEPTION_POINTERS *Info)
     }
     return EXCEPTION_CONTINUE_SEARCH;
 }
+
+uintptr_t *cpthk_get_param(PCPTHOOK_CTX ctx, int index)
+{
+    if (index >= (int)ctx->CallingConvention->ArgumentsCount)
+    {
+        return NULL;
+    }
+
+    ARGUMENT arg = ctx->CallingConvention->Arguments[index];
+
+    if (arg.Gpr)
+    {
+        switch (arg.Position.Reg)
+        {
+        case FD_REG_AX:
+            return &ctx->CpuContext->Rax;
+        case FD_REG_BX:
+            return &ctx->CpuContext->Rbx;
+        case FD_REG_CX:
+            return &ctx->CpuContext->Rcx;
+        case FD_REG_DX:
+            return &ctx->CpuContext->Rdx;
+        case FD_REG_SI:
+            return &ctx->CpuContext->Rsi;
+        case FD_REG_DI:
+            return &ctx->CpuContext->Rdi;
+        case FD_REG_BP:
+            return &ctx->CpuContext->Rbp;
+        case FD_REG_SP:
+            return &ctx->CpuContext->Rsp;
+        case FD_REG_R8:
+            return &ctx->CpuContext->R8;
+        case FD_REG_R9:
+            return &ctx->CpuContext->R9;
+        case FD_REG_R10:
+            return &ctx->CpuContext->R10;
+        case FD_REG_R11:
+            return &ctx->CpuContext->R11;
+        case FD_REG_R12:
+            return &ctx->CpuContext->R12;
+        case FD_REG_R13:
+            return &ctx->CpuContext->R13;
+        case FD_REG_R14:
+            return &ctx->CpuContext->R14;
+        case FD_REG_R15:
+            return &ctx->CpuContext->R15;
+        default:
+            return NULL;
+        }
+    }
+    else if (arg.Vec)
+    {
+        switch (arg.Position.Reg)
+        {
+        case FD_REG_R0:
+            return (uintptr_t *)&ctx->CpuContext->Xmm0;
+        case FD_REG_R1:
+            return (uintptr_t *)&ctx->CpuContext->Xmm1;
+        case FD_REG_R2:
+            return (uintptr_t *)&ctx->CpuContext->Xmm2;
+        case FD_REG_R3:
+            return (uintptr_t *)&ctx->CpuContext->Xmm3;
+        case FD_REG_R4:
+            return (uintptr_t *)&ctx->CpuContext->Xmm4;
+        case FD_REG_R5:
+            return (uintptr_t *)&ctx->CpuContext->Xmm5;
+        case FD_REG_R6:
+            return (uintptr_t *)&ctx->CpuContext->Xmm6;
+        case FD_REG_R7:
+            return (uintptr_t *)&ctx->CpuContext->Xmm7;
+        case FD_REG_R8:
+            return (uintptr_t *)&ctx->CpuContext->Xmm8;
+        case FD_REG_R9:
+            return (uintptr_t *)&ctx->CpuContext->Xmm9;
+        case FD_REG_R10:
+            return (uintptr_t *)&ctx->CpuContext->Xmm10;
+        case FD_REG_R11:
+            return (uintptr_t *)&ctx->CpuContext->Xmm11;
+        case FD_REG_R12:
+            return (uintptr_t *)&ctx->CpuContext->Xmm12;
+        case FD_REG_R13:
+            return (uintptr_t *)&ctx->CpuContext->Xmm13;
+        case FD_REG_R14:
+            return (uintptr_t *)&ctx->CpuContext->Xmm14;
+        case FD_REG_R15:
+            return (uintptr_t *)&ctx->CpuContext->Xmm15;
+        default:
+            return NULL;
+        }
+    }
+    else if (arg.Stack)
+    {
+        switch (arg.Position.Reg)
+        {
+        case FD_REG_SP:
+            return (DWORD64 *)(ctx->CpuContext->Rsp + arg.Position.Offset);
+        case FD_REG_BP:
+            return (DWORD64 *)(ctx->CpuContext->Rbp + arg.Position.Offset);
+        default:
+            return (DWORD64 *)(ctx->CpuContext->Rsp + arg.Position.Offset);
+        }
+    }
+
+    return NULL;
+}
+
+void cpthk_set_param_int(PCPTHOOK_CTX ctx, int index, uintptr_t value)
+{
+    uintptr_t *arg = cpthk_get_param(ctx, index);
+    if (arg)
+    {
+        *arg = value;
+    }
+}
+
+void cpthk_set_param_float(PCPTHOOK_CTX ctx, int index, double value)
+{
+    uintptr_t *arg = cpthk_get_param(ctx, index);
+    if (arg)
+    {
+        *(double *)arg = value;
+    }
+}
+
+uintptr_t *cpthk_get_return_param(PCPTHOOK_CTX ctx)
+{
+    if (ctx->CallingConvention->ReturnArg.Gpr)
+    {
+        switch (ctx->CallingConvention->ReturnArg.Position.Reg)
+        {
+        case FD_REG_AX:
+            return &ctx->CpuContext->Rax;
+            break;
+        case FD_REG_BX:
+            return &ctx->CpuContext->Rbx;
+            break;
+        case FD_REG_CX:
+            return &ctx->CpuContext->Rcx;
+            break;
+        case FD_REG_DX:
+            return &ctx->CpuContext->Rdx;
+            break;
+        case FD_REG_SI:
+            return &ctx->CpuContext->Rsi;
+            break;
+        case FD_REG_DI:
+            return &ctx->CpuContext->Rdi;
+            break;
+        case FD_REG_R8:
+            return &ctx->CpuContext->R8;
+            break;
+        case FD_REG_R9:
+            return &ctx->CpuContext->R9;
+            break;
+        case FD_REG_R10:
+            return &ctx->CpuContext->R10;
+            break;
+        case FD_REG_R11:
+            return &ctx->CpuContext->R11;
+            break;
+        case FD_REG_R12:
+            return &ctx->CpuContext->R12;
+            break;
+        case FD_REG_R13:
+            return &ctx->CpuContext->R13;
+            break;
+        case FD_REG_R14:
+            return &ctx->CpuContext->R14;
+            break;
+        case FD_REG_R15:
+            return &ctx->CpuContext->R15;
+            break;
+        default:
+            return NULL;
+        }
+    }
+    else if (ctx->CallingConvention->ReturnArg.Vec)
+    {
+        switch (ctx->CallingConvention->ReturnArg.Position.Reg)
+        {
+        case FD_REG_R0:
+            return (uintptr_t *)&ctx->CpuContext->Xmm0;
+            break;
+        case FD_REG_R1:
+            return (uintptr_t *)&ctx->CpuContext->Xmm1;
+            break;
+        case FD_REG_R2:
+            return (uintptr_t *)&ctx->CpuContext->Xmm2;
+            break;
+        case FD_REG_R3:
+            return (uintptr_t *)&ctx->CpuContext->Xmm3;
+            break;
+        case FD_REG_R4:
+            return (uintptr_t *)&ctx->CpuContext->Xmm4;
+            break;
+        case FD_REG_R5:
+            return (uintptr_t *)&ctx->CpuContext->Xmm5;
+            break;
+        case FD_REG_R6:
+            return (uintptr_t *)&ctx->CpuContext->Xmm6;
+            break;
+        case FD_REG_R7:
+            return (uintptr_t *)&ctx->CpuContext->Xmm7;
+            break;
+        case FD_REG_R8:
+            return (uintptr_t *)&ctx->CpuContext->Xmm8;
+            break;
+        case FD_REG_R9:
+            return (uintptr_t *)&ctx->CpuContext->Xmm9;
+            break;
+        case FD_REG_R10:
+            return (uintptr_t *)&ctx->CpuContext->Xmm10;
+            break;
+        case FD_REG_R11:
+            return (uintptr_t *)&ctx->CpuContext->Xmm11;
+            break;
+        case FD_REG_R12:
+            return (uintptr_t *)&ctx->CpuContext->Xmm12;
+            break;
+        case FD_REG_R13:
+            return (uintptr_t *)&ctx->CpuContext->Xmm13;
+            break;
+        case FD_REG_R14:
+            return (uintptr_t *)&ctx->CpuContext->Xmm14;
+            break;
+        case FD_REG_R15:
+            return (uintptr_t *)&ctx->CpuContext->Xmm15;
+            break;
+        default:
+            return NULL;
+        }
+    }
+    else if (ctx->CallingConvention->ReturnArg.Stack)
+    {
+        switch (ctx->CallingConvention->ReturnArg.Position.Reg)
+        {
+        case FD_REG_SP:
+            return (uintptr_t *)(ctx->CpuContext->Rsp + ctx->CallingConvention->ReturnArg.Position.Offset);
+        case FD_REG_BP:
+            return (uintptr_t *)(ctx->CpuContext->Rbp + ctx->CallingConvention->ReturnArg.Position.Offset);
+        default:
+            return (uintptr_t *)(ctx->CpuContext->Rsp + ctx->CallingConvention->ReturnArg.Position.Offset);
+            break;
+        }
+    }
+    return NULL;
+}
+
+void cpthk_set_return_param_int(PCPTHOOK_CTX ctx, uintptr_t value)
+{
+    uintptr_t *arg = cpthk_get_return_param(ctx);
+    if (arg)
+    {
+        *arg = value;
+    }
+}
+
+void cpthk_set_return_param_float(PCPTHOOK_CTX ctx, double value)
+{
+    uintptr_t *arg = cpthk_get_return_param(ctx);
+    if (arg)
+    {
+        *(double *)arg = value;
+    }
+}
 #else
 DWORD WINAPI cpthk_veh(EXCEPTION_POINTERS *Info)
 {
@@ -69,6 +334,130 @@ DWORD WINAPI cpthk_veh(EXCEPTION_POINTERS *Info)
     }
     return EXCEPTION_CONTINUE_SEARCH;
 }
+
+uintptr_t *cpthk_get_param(PCPTHOOK_CTX ctx, int index)
+{
+    if (index >= (int)ctx->CallingConvention->ArgumentsCount)
+    {
+        return NULL;
+    }
+
+    ARGUMENT arg = ctx->CallingConvention->Arguments[index];
+
+    if (arg.Gpr)
+    {
+        switch (arg.Position.Reg)
+        {
+        case FD_REG_AX:
+            return (uintptr_t *)&ctx->CpuContext->Eax;
+        case FD_REG_BX:
+            return (uintptr_t *)&ctx->CpuContext->Ebx;
+        case FD_REG_CX:
+            return (uintptr_t *)&ctx->CpuContext->Ecx;
+        case FD_REG_DX:
+            return (uintptr_t *)&ctx->CpuContext->Edx;
+        case FD_REG_SI:
+            return (uintptr_t *)&ctx->CpuContext->Esi;
+        case FD_REG_DI:
+            return (uintptr_t *)&ctx->CpuContext->Edi;
+        case FD_REG_BP:
+            return (uintptr_t *)&ctx->CpuContext->Ebp;
+        case FD_REG_SP:
+            return (uintptr_t *)&ctx->CpuContext->Esp;
+        default:
+            return NULL;
+        }
+    }
+    else if (arg.Stack)
+    {
+        switch (arg.Position.Reg)
+        {
+        case FD_REG_SP:
+            return (uintptr_t *)(ctx->CpuContext->Esp + arg.Position.Offset);
+        case FD_REG_BP:
+            return (uintptr_t *)(ctx->CpuContext->Ebp + arg.Position.Offset);
+        default:
+            return (uintptr_t *)(ctx->CpuContext->Esp + arg.Position.Offset);
+        }
+    }
+
+    return NULL;
+}
+
+void cpthk_set_param_int(PCPTHOOK_CTX ctx, int index, uintptr_t value)
+{
+    uintptr_t *arg = cpthk_get_param(ctx, index);
+    if (arg)
+    {
+        *arg = value;
+    }
+}
+
+void cpthk_set_param_float(PCPTHOOK_CTX ctx, int index, double value)
+{
+    uintptr_t *arg = cpthk_get_param(ctx, index);
+    if (arg)
+    {
+        *(double *)arg = value;
+    }
+}
+
+uintptr_t *cpthk_get_return_param(PCPTHOOK_CTX ctx)
+{
+    if (ctx->CallingConvention->ReturnArg.Gpr)
+    {
+        switch (ctx->CallingConvention->ReturnArg.Position.Reg)
+        {
+        case FD_REG_AX:
+            return (uintptr_t *)&ctx->CpuContext->Eax;
+        case FD_REG_BX:
+            return (uintptr_t *)&ctx->CpuContext->Ebx;
+        case FD_REG_CX:
+            return (uintptr_t *)&ctx->CpuContext->Ecx;
+        case FD_REG_DX:
+            return (uintptr_t *)&ctx->CpuContext->Edx;
+        case FD_REG_SI:
+            return (uintptr_t *)&ctx->CpuContext->Esi;
+        case FD_REG_DI:
+            return (uintptr_t *)&ctx->CpuContext->Edi;
+        default:
+            return NULL;
+        }
+    }
+    else if (ctx->CallingConvention->ReturnArg.Stack)
+    {
+        switch (ctx->CallingConvention->ReturnArg.Position.Reg)
+        {
+        case FD_REG_SP:
+            return (uintptr_t *)(ctx->CpuContext->Esp + ctx->CallingConvention->ReturnArg.Position.Offset);
+        case FD_REG_BP:
+            return (uintptr_t *)(ctx->CpuContext->Ebp + ctx->CallingConvention->ReturnArg.Position.Offset);
+        default:
+            return (uintptr_t *)(ctx->CpuContext->Esp + ctx->CallingConvention->ReturnArg.Position.Offset);
+        }
+    }
+
+    return NULL;
+}
+
+void cpthk_set_return_param_int(PCPTHOOK_CTX ctx, uintptr_t value)
+{
+    uintptr_t *arg = cpthk_get_return_param(ctx);
+    if (arg)
+    {
+        *arg = value;
+    }
+}
+
+void cpthk_set_return_param_float(PCPTHOOK_CTX ctx, double value)
+{
+    uintptr_t *arg = cpthk_get_return_param(ctx);
+    if (arg)
+    {
+        *(double *)arg = value;
+    }
+}
+
 #endif
 
 CPTHK_STATUS cpthk_init(void)
@@ -394,6 +783,74 @@ CPTHK_STATUS cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC Ex
 
     if (!cpthk_operate_threads(THREAD_OP_RESUME))
         return CPTHK_UNABLE_TO_CONTROL_THREADS;
+
+    return CPTHK_OK;
+}
+
+CPTHK_STATUS cpthk_disable(uintptr_t FunctionAddress)
+{
+    if (!HookListInitialized)
+        return CPTHK_NOT_INITIALIZED;
+
+    if (!cpthk_operate_threads(THREAD_OP_SUSPEND))
+        return CPTHK_UNABLE_TO_CONTROL_THREADS;
+
+    bool found = false;
+
+    // loop through the hook list and find the hook
+    for (size_t i = 0; i < HookList->Count; i++)
+    {
+        if (HookList->Entries[i].FunctionAddress == FunctionAddress)
+        {
+            found = true;
+            // found the hook
+
+            // disable the hook
+            HookList->Entries[i].Enabled = false;
+        }
+    }
+
+    if (!cpthk_operate_threads(THREAD_OP_RESUME))
+        return CPTHK_UNABLE_TO_CONTROL_THREADS;
+
+    if (!found)
+    {
+        return CPTHK_HOOK_NOT_FOUND;
+    }
+
+    return CPTHK_OK;
+}
+
+CPTHK_STATUS cpthk_enable(uintptr_t FunctionAddress)
+{
+    if (!HookListInitialized)
+        return CPTHK_NOT_INITIALIZED;
+
+    if (!cpthk_operate_threads(THREAD_OP_SUSPEND))
+        return CPTHK_UNABLE_TO_CONTROL_THREADS;
+
+    bool found = false;
+
+    // loop through the hook list and find the hook
+    for (size_t i = 0; i < HookList->Count; i++)
+    {
+        if (HookList->Entries[i].FunctionAddress == FunctionAddress)
+        {
+            found = true;
+            // found the hook
+
+            // disable the hook
+            HookList->Entries[i].Enabled = true;
+        }
+    }
+
+    if (!cpthk_operate_threads(THREAD_OP_RESUME))
+        return CPTHK_UNABLE_TO_CONTROL_THREADS;
+
+    if (!found)
+    {
+        return CPTHK_HOOK_NOT_FOUND;
+    }
 
     return CPTHK_OK;
 }

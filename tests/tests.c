@@ -87,13 +87,14 @@ void __stack_chk_fail(void)
 
 void __stdcall entryhook(PCPTHOOK_CTX ctx)
 {
-    LOG_INFO("Inside HookEntry", NULL);
+    cpthk_set_param_int(ctx, 2, 25);
+    cpthk_set_param_int(ctx, 3, 29);
 }
 
 void __stdcall exithook(PCPTHOOK_CTX ctx)
 {
-    LOG_INFO("Inside HookExit", NULL);
-    ctx->CpuContext->Rax = 0x1337;
+    uintptr_t *ret = cpthk_get_return_param(ctx);
+    printf("next ret: %p\n", *ret);
 }
 
 int main(int argc, char **argv)
@@ -106,7 +107,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    CPTHK_STATUS status = cpthk_hook((uintptr_t)VirtualAlloc, entryhook, exithook);
+    CPTHK_STATUS status = cpthk_hook((uintptr_t)test4i, entryhook, exithook);
 
     if (status != CPTHK_OK)
     {
@@ -116,15 +117,37 @@ int main(int argc, char **argv)
 
     system("pause");
 
-    printf("res = %p\n", VirtualAlloc(0, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    printf("res = %p\n", test4i(1, 2, 3, 4));
 
-    if (cpthk_unhook((uintptr_t)VirtualAlloc) != CPTHK_OK)
+    if (cpthk_disable((uintptr_t)test4i) != CPTHK_OK)
+    {
+        LOG_ERROR("Failed to disable test4i (%s)", cpthk_str_error(status));
+        return 1;
+    }
+
+    printf("res = %p\n", test4i(1, 2, 3, 4));
+
+    if (cpthk_enable((uintptr_t)test4i) != CPTHK_OK)
+    {
+        LOG_ERROR("Failed to enable test4i (%s)", cpthk_str_error(status));
+        return 1;
+    }
+
+    printf("res = %p\n", test4i(1, 2, 3, 4));
+
+    if (cpthk_unhook((uintptr_t)test4i) != CPTHK_OK)
     {
         LOG_ERROR("Failed to unhook test4i (%s)", cpthk_str_error(status));
         return 1;
     }
 
-    printf("res = %p\n", VirtualAlloc(0, 0x1000, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+    printf("res = %p\n", test4i(1, 2, 3, 4));
+
+    if ((status = cpthk_enable((uintptr_t)test4i)) != CPTHK_OK)
+    {
+        LOG_ERROR("Failed to enable test4i (%s)", cpthk_str_error(status));
+        return 1;
+    }
 
     cpthk_uninit();
     return 0;

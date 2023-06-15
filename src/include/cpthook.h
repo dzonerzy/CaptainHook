@@ -14,12 +14,6 @@
 
 #define HOOKSIZE 5
 
-typedef struct uint128_t
-{
-    unsigned long long lo;
-    unsigned long long hi;
-} uint128_t;
-
 #pragma pack(push, 1)
 typedef struct _CPTHOOK_CTX
 {
@@ -84,6 +78,16 @@ CPTHK_STATUS cpthk_init(void);
 CPTHK_STATUS cpthk_uninit(void);
 CPTHK_STATUS cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC ExitHook);
 CPTHK_STATUS cpthk_unhook(uintptr_t FunctionAddress);
+CPTHK_STATUS cpthk_enable(uintptr_t FunctionAddress);
+CPTHK_STATUS cpthk_disable(uintptr_t FunctionAddress);
+
+uintptr_t *cpthk_get_param(PCPTHOOK_CTX ctx, int index);
+void cpthk_set_param_int(PCPTHOOK_CTX ctx, int index, uintptr_t value);
+void cpthk_set_param_float(PCPTHOOK_CTX ctx, int index, double value);
+uintptr_t *cpthk_get_return_param(PCPTHOOK_CTX ctx);
+void cpthk_set_return_param_int(PCPTHOOK_CTX ctx, uintptr_t value);
+void cpthk_set_return_param_float(PCPTHOOK_CTX ctx, double value);
+
 char *cpthk_str_error(CPTHK_STATUS Status);
 char *cpthk_version(void);
 

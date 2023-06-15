@@ -1178,7 +1178,7 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
     if (list3)
     {
         returnCallingConvention = cpthk_emu_traces(list3, &cpu, TEMU_PRIORITIZE_WRITE_FLAG, TEMU_ANAL_RETURN);
-        if (returnCallingConvention->ReturnRegister != FD_REG_NONE)
+        if (returnCallingConvention->ReturnArg.Position.Reg != FD_REG_NONE)
         {
             retFound = true;
         }
@@ -1190,7 +1190,7 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
         if (list3)
         {
             returnCallingConvention = cpthk_emu_traces(list3, &cpu, TEMU_PRIORITIZE_WRITE_FLAG, TEMU_ANAL_RETURN);
-            if (returnCallingConvention->ReturnRegister != FD_REG_NONE)
+            if (returnCallingConvention->ReturnArg.Position.Reg != FD_REG_NONE)
             {
                 retFound = true;
                 returnCallingConvention->ExitHookAddress = cfg->Tail->Address;
@@ -1199,7 +1199,7 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
     }
 
     paramCallingConvention->ExitHookAddress = returnCallingConvention->ExitHookAddress;
-    paramCallingConvention->ReturnRegister = returnCallingConvention->ReturnRegister;
+    paramCallingConvention->ReturnArg = returnCallingConvention->ReturnArg;
 
     // free everything
     cpthk_free_trace_list(list);
@@ -1210,7 +1210,7 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
     free(returnCallingConvention);
 
     printf("Calling convention:\n");
-    printf("  Return register: %d\n", paramCallingConvention->ReturnRegister);
+    printf("  Return register: %d\n", paramCallingConvention->ReturnArg.Position.Reg);
     printf("  Argument count: %d\n", paramCallingConvention->ArgumentsCount);
     printf("  Arguments:\n");
     for (size_t i = 0; i < paramCallingConvention->ArgumentsCount; ++i)
