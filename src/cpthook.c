@@ -477,7 +477,12 @@ CPTHK_STATUS cpthk_init(void)
 
     memset(HookList->Entries, 0, HookList->Size * sizeof(HOOK_ENTRY));
 
-    if (!AddVectoredExceptionHandler(1, (PVECTORED_EXCEPTION_HANDLER)cpthk_veh))
+    if (!SetUnhandledExceptionFilter((LPTOP_LEVEL_EXCEPTION_FILTER)cpthk_veh))
+    {
+        return CPTHK_ERROR;
+    }
+
+    if (!AddVectoredContinueHandler(1, (PVECTORED_EXCEPTION_HANDLER)cpthk_veh))
     {
         return CPTHK_ERROR;
     }
