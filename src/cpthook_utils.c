@@ -157,6 +157,16 @@ bool cpthk_protect_function(PCONTROL_FLOW_GRAPH Cfg, DWORD Protection)
     return true;
 }
 
+bool cpthk_tiny_protect_function(uintptr_t Address, DWORD Protection)
+{
+    DWORD oldProtect;
+
+    if (!VirtualProtect((void *)Address, 0x100, Protection, &oldProtect))
+        return false;
+
+    return true;
+}
+
 size_t cpthk_write_ud2(uintptr_t Address, unsigned char *saveBuffer, bool entry)
 {
     // decode instruction at Address and write a jmp to Destination

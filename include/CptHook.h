@@ -159,6 +159,41 @@ typedef struct _FLOW_GRAPH_NODE
     PCONTROL_FLOW_GRAPH Graph;
 } FLOW_GRAPH_NODE, *PFLOW_GRAPH_NODE;
 
+#define CPTHK_HOOK_NAME(fnc) cpthk_##fnc##_hook
+#define CPTHK_HOOKFNC(fnc) void __stdcall cpthk_##fnc##_hook(PCPTHOOK_CTX ctx)
+
+#if defined(_WIN64)
+#define CPTHK_REG_AX(ctx) ((ctx)->CpuContext->Rax)
+#define CPTHK_REG_BX(ctx) ((ctx)->CpuContext->Rbx)
+#define CPTHK_REG_CX(ctx) ((ctx)->CpuContext->Rcx)
+#define CPTHK_REG_DX(ctx) ((ctx)->CpuContext->Rdx)
+#define CPTHK_REG_DI(ctx) ((ctx)->CpuContext->Rdi)
+#define CPTHK_REG_SI(ctx) ((ctx)->CpuContext->Rsi)
+#define CPTHK_REG_IP(ctx) ((ctx)->CpuContext->Rip)
+#define CPTHK_REG_SP(ctx) ((ctx)->CpuContext->Rsp)
+#define CPTHK_REG_BP(ctx) ((ctx)->CpuContext->Rbp)
+#define CPTHK_REG_FLAGS(ctx) ((ctx)->CpuContext->EFlags)
+#define CPTHK_REG_R8(ctx) ((ctx)->CpuContext->R8)
+#define CPTHK_REG_R9(ctx) ((ctx)->CpuContext->R9)
+#define CPTHK_REG_R10(ctx) ((ctx)->CpuContext->R10)
+#define CPTHK_REG_R11(ctx) ((ctx)->CpuContext->R11)
+#define CPTHK_REG_R12(ctx) ((ctx)->CpuContext->R12)
+#define CPTHK_REG_R13(ctx) ((ctx)->CpuContext->R13)
+#define CPTHK_REG_R14(ctx) ((ctx)->CpuContext->R14)
+#define CPTHK_REG_R15(ctx) ((ctx)->CpuContext->R15)
+#else
+#define CPTHK_REG_AX(ctx) ((ctx)->CpuContext->Eax)
+#define CPTHK_REG_BX(ctx) ((ctx)->CpuContext->Ebx)
+#define CPTHK_REG_CX(ctx) ((ctx)->CpuContext->Ecx)
+#define CPTHK_REG_DX(ctx) ((ctx)->CpuContext->Edx)
+#define CPTHK_REG_DI(ctx) ((ctx)->CpuContext->Edi)
+#define CPTHK_REG_SI(ctx) ((ctx)->CpuContext->Esi)
+#define CPTHK_REG_IP(ctx) ((ctx)->CpuContext->Eip)
+#define CPTHK_REG_SP(ctx) ((ctx)->CpuContext->Esp)
+#define CPTHK_REG_BP(ctx) ((ctx)->CpuContext->Ebp)
+#define CPTHK_REG_FLAGS(ctx) ((ctx)->CpuContext->EFlags)
+#endif
+
 #if defined(__cplusplus)
 extern "C"
 {
@@ -167,7 +202,9 @@ extern "C"
     CPTHK_STATUS cpthk_init(void);
     CPTHK_STATUS cpthk_uninit(void);
     CPTHK_STATUS cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC ExitHook);
+    CPTHK_STATUS cpthk_tiny_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook);
     CPTHK_STATUS cpthk_unhook(uintptr_t FunctionAddress);
+    CPTHK_STATUS cpthk_tiny_unhook(uintptr_t FunctionAddress);
     CPTHK_STATUS cpthk_enable(uintptr_t FunctionAddress);
     CPTHK_STATUS cpthk_disable(uintptr_t FunctionAddress);
 

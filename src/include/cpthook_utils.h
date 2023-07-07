@@ -28,4 +28,5 @@ uintptr_t cpthk_find_pattern(uint8_t *pBuffer, DWORD dwBufferSize, const char *p
 void cpthk_get_text_section(uintptr_t *textSection, size_t *textSize);
 bool cpthk_operate_threads(THREAD_OP Operation);
 bool cpthk_protect_function(PCONTROL_FLOW_GRAPH Cfg, DWORD Protection);
+bool cpthk_tiny_protect_function(uintptr_t Address, DWORD Protection);
 size_t cpthk_write_ud2(uintptr_t Address, unsigned char *saveBuffer, bool entry);

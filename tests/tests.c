@@ -80,18 +80,28 @@ void __stack_chk_guard_setup(void)
     __stack_chk_guard = 0xBAAAAAAD; // provide some magic numbers
 }
 
-void __stack_chk_fail(void)
-{
-    /* Error message */
-}
+void __stack_chk_fail(void);
 
-void __stdcall entryhook(PCPTHOOK_CTX ctx)
+CPTHK_HOOKFNC(entryhook)
 {
     cpthk_set_param_int(ctx, 2, 25);
     cpthk_set_param_int(ctx, 3, 29);
 }
 
-void __stdcall exithook(PCPTHOOK_CTX ctx)
+CPTHK_HOOKFNC(entryhook_tiny)
+{
+    printf("[+] entryhook_tiny\n");
+    printf("    Registers:\n");
+    printf("    AX: %p\n", CPTHK_REG_AX(ctx));
+    printf("    BX: %p\n", CPTHK_REG_BX(ctx));
+    printf("    CX: %p\n", CPTHK_REG_CX(ctx));
+    printf("    DX: %p\n", CPTHK_REG_DX(ctx));
+    printf("    DI: %p\n", CPTHK_REG_DI(ctx));
+    printf("    SI: %p\n", CPTHK_REG_SI(ctx));
+    printf("    IP: %p\n", CPTHK_REG_IP(ctx));
+}
+
+CPTHK_HOOKFNC(exithook)
 {
     uintptr_t *ret = cpthk_get_return_param(ctx);
     printf("next ret: %p\n", *ret);
@@ -107,8 +117,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    CPTHK_STATUS status = cpthk_hook((uintptr_t)test4i, entryhook, exithook);
-
+    CPTHK_STATUS status = cpthk_hook((uintptr_t)test4i, CPTHK_HOOK_NAME(entryhook), CPTHK_HOOK_NAME(exithook));
     if (status != CPTHK_OK)
     {
         LOG_ERROR("Failed to hook test4i (%s)", cpthk_str_error(status));
@@ -146,6 +155,23 @@ int main(int argc, char **argv)
     if ((status = cpthk_enable((uintptr_t)test4i)) != CPTHK_OK)
     {
         LOG_ERROR("Failed to enable test4i (%s)", cpthk_str_error(status));
+    }
+
+    if ((status = cpthk_tiny_hook((uintptr_t)test4i, CPTHK_HOOK_NAME(entryhook_tiny))) != CPTHK_OK)
+    {
+        LOG_ERROR("Failed to hook test4i (%s)", cpthk_str_error(status));
+        return 1;
+    }
+
+    printf("tiny hook on %p\n", test4i);
+    printf("press enter to continue....\n");
+    getchar();
+
+    printf("res = %p\n", test4i(1, 2, 3, 4));
+
+    if ((status = cpthk_tiny_unhook((uintptr_t)test4i)) != CPTHK_OK)
+    {
+        LOG_ERROR("Failed to unhook test4i (%s)", cpthk_str_error(status));
         return 1;
     }
 

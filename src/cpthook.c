@@ -8,10 +8,12 @@ ULONGLONG WINAPI cpthk_veh(EXCEPTION_POINTERS *Info)
 {
     if (Info->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION)
     {
+        printf("Exception on %p\n", Info->ExceptionRecord->ExceptionAddress);
+
         uintptr_t EAddr = (uintptr_t)Info->ExceptionRecord->ExceptionAddress;
         unsigned short index = *(unsigned short *)(EAddr + 2);
         unsigned char isEntry = *(unsigned char *)(EAddr + 4);
-        PHOOK_ENTRY entry = &HookList->Entries[index];
+        PHOOK_ENTRY entry = HookList->Entries[index];
 
         entry->HookContext->CpuContext = Info->ContextRecord;
 
@@ -473,16 +475,11 @@ CPTHK_STATUS cpthk_init(void)
 
     HookList->Size = 128;
     HookList->Count = 0;
-    HookList->Entries = (PHOOK_ENTRY)malloc(HookList->Size * sizeof(HOOK_ENTRY));
+    HookList->Entries = (PHOOK_ENTRY)malloc(HookList->Size * sizeof(PHOOK_ENTRY));
 
-    memset(HookList->Entries, 0, HookList->Size * sizeof(HOOK_ENTRY));
+    memset(HookList->Entries, 0, HookList->Size * sizeof(PHOOK_ENTRY));
 
-    if (!SetUnhandledExceptionFilter((LPTOP_LEVEL_EXCEPTION_FILTER)cpthk_veh))
-    {
-        return CPTHK_ERROR;
-    }
-
-    if (!AddVectoredContinueHandler(1, (PVECTORED_EXCEPTION_HANDLER)cpthk_veh))
+    if (!AddVectoredExceptionHandler(1, (PVECTORED_EXCEPTION_HANDLER)cpthk_veh))
     {
         return CPTHK_ERROR;
     }
@@ -628,10 +625,10 @@ void cpthk_restore(uintptr_t Address, uint8_t *Buffer, size_t OldBufSize)
 
 bool cpthk_hook_add_internal(PCONTROL_FLOW_GRAPH Cfg, PCALLING_CONVENTION CallingConvention, HOOKFNC HookEntry, HOOKFNC HookExit)
 {
-    if (HookList->Size > HookList->Count)
+    if (HookList->Count + 1 >= HookList->Size)
     {
         HookList->Size += 10;
-        HookList->Entries = (PHOOK_ENTRY)realloc(HookList->Entries, HookList->Size * sizeof(HOOK_ENTRY));
+        HookList->Entries = (PHOOK_ENTRY)realloc(HookList->Entries, HookList->Size * sizeof(PHOOK_ENTRY));
         if (!HookList->Entries)
         {
             HookList->Size -= 10;
@@ -639,7 +636,17 @@ bool cpthk_hook_add_internal(PCONTROL_FLOW_GRAPH Cfg, PCALLING_CONVENTION Callin
         }
     }
 
-    PHOOK_ENTRY Entry = &HookList->Entries[HookList->Count++];
+    // get the hookentry index
+    int hookEntryIndex = HookList->Count++;
+    PHOOK_ENTRY *pEntry = &HookList->Entries[hookEntryIndex];
+
+    if (!*pEntry)
+    {
+        // allocate the hook entry
+        *pEntry = (PHOOK_ENTRY)malloc(sizeof(HOOK_ENTRY));
+    }
+
+    PHOOK_ENTRY Entry = *pEntry;
 
     PCPTHOOK_CTX HookContext = malloc(sizeof(CPTHOOK_CTX));
     memset(HookContext, 0, sizeof(CPTHOOK_CTX));
@@ -748,6 +755,127 @@ bool cpthk_hook_add_internal(PCONTROL_FLOW_GRAPH Cfg, PCALLING_CONVENTION Callin
     return true;
 }
 
+bool cpthk_tiny_hook_add_internal(uintptr_t Address, HOOKFNC HookEntry)
+{
+    if (HookList->Count + 1 >= HookList->Size)
+    {
+        HookList->Size += 10;
+        HookList->Entries = (PHOOK_ENTRY)realloc(HookList->Entries, HookList->Size * sizeof(PHOOK_ENTRY));
+        if (!HookList->Entries)
+        {
+            HookList->Size -= 10;
+            return false;
+        }
+    }
+
+    // get the hookentry index
+    int hookEntryIndex = HookList->Count++;
+    printf("hookEntryIndex: %d\n", hookEntryIndex);
+    PHOOK_ENTRY *pEntry = &HookList->Entries[hookEntryIndex];
+
+    printf("*pEntry: %p\n", *pEntry);
+
+    if (!*pEntry)
+    {
+        // allocate the hook entry
+        *pEntry = (PHOOK_ENTRY)malloc(sizeof(HOOK_ENTRY));
+    }
+
+    PHOOK_ENTRY Entry = *pEntry;
+
+    PCPTHOOK_CTX HookContext = malloc(sizeof(CPTHOOK_CTX));
+    memset(HookContext, 0, sizeof(CPTHOOK_CTX));
+
+    Entry->Cfg = NULL;
+    Entry->FunctionAddress = Address;
+    Entry->FunctionSize = 0;
+    Entry->Enabled = true;
+    Entry->HookContext = (PCPTHOOK_CTX)HookContext;
+    Entry->HookContext->CallingConvention = NULL;
+    Entry->HookContext->EntryHook = HookEntry;
+    Entry->HookContext->ExitHook = NULL;
+
+    if (HookEntry && Address)
+    {
+        // write the jmp to the entry hook
+        unsigned char originalEntryBytes[HOOKSIZE + 15];
+        size_t entryReplacedBytesSize = cpthk_write_ud2(Address, (unsigned char *)&originalEntryBytes, true);
+
+        if (entryReplacedBytesSize == 0)
+        {
+            return false;
+        }
+
+        // Save original Entry bytes
+        Entry->OriginalEntrySize = entryReplacedBytesSize;
+        memcpy(Entry->OriginalEntryBytes, originalEntryBytes, entryReplacedBytesSize);
+
+        // Allocate space for the trampoline
+        Entry->HookContext->HookTrampolineEntry = (uintptr_t)malloc(entryReplacedBytesSize + (15 * 6));
+        printf("HookTrampolineEntry: %p\n", Entry->HookContext->HookTrampolineEntry);
+
+        if (!Entry->HookContext->HookTrampolineEntry)
+        {
+            cpthk_restore(Address, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
+            return false;
+        }
+        else
+        {
+            memset((void *)Entry->HookContext->HookTrampolineEntry, 0, entryReplacedBytesSize + (15 * 6));
+        }
+
+        // Write the trampoline
+        if (!cpthk_write_trampoline(Entry->HookContext->HookTrampolineEntry, Address, originalEntryBytes, entryReplacedBytesSize))
+        {
+            cpthk_restore(Address, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
+            free((void *)Entry->HookContext->HookTrampolineEntry);
+            return false;
+        }
+    }
+
+    if (HookEntry && Address)
+    {
+        DWORD oldProtect = 0;
+        if (!VirtualProtect((void *)Entry->HookContext->HookTrampolineEntry, Entry->OriginalEntrySize, PAGE_EXECUTE_READWRITE, &oldProtect))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+CPTHK_STATUS cpthk_tiny_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook)
+{
+    if (!HookListInitialized)
+        return CPTHK_NOT_INITIALIZED;
+
+    if (!cpthk_operate_threads(THREAD_OP_SUSPEND))
+        return CPTHK_UNABLE_TO_CONTROL_THREADS;
+
+    if (!cpthk_tiny_protect_function(FunctionAddress, PAGE_EXECUTE_READWRITE))
+    {
+        return CPTHK_UNABLE_TO_PROTECT_MEMORY;
+    }
+
+    // Add the actual hook here
+    if (!cpthk_tiny_hook_add_internal(FunctionAddress, EntryHook))
+    {
+        return CPTHK_INTERNAL_ERROR;
+    }
+
+    // End of hook
+    if (!cpthk_tiny_protect_function(FunctionAddress, PAGE_EXECUTE_READ))
+    {
+        return CPTHK_UNABLE_TO_PROTECT_MEMORY;
+    }
+
+    if (!cpthk_operate_threads(THREAD_OP_RESUME))
+        return CPTHK_UNABLE_TO_CONTROL_THREADS;
+
+    return CPTHK_OK;
+}
+
 CPTHK_STATUS cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC ExitHook)
 {
     if (!HookListInitialized)
@@ -805,13 +933,13 @@ CPTHK_STATUS cpthk_disable(uintptr_t FunctionAddress)
     // loop through the hook list and find the hook
     for (size_t i = 0; i < HookList->Count; i++)
     {
-        if (HookList->Entries[i].FunctionAddress == FunctionAddress)
+        if (HookList->Entries[i] != NULL && HookList->Entries[i]->FunctionAddress == FunctionAddress)
         {
             found = true;
             // found the hook
 
             // disable the hook
-            HookList->Entries[i].Enabled = false;
+            HookList->Entries[i]->Enabled = false;
         }
     }
 
@@ -839,13 +967,13 @@ CPTHK_STATUS cpthk_enable(uintptr_t FunctionAddress)
     // loop through the hook list and find the hook
     for (size_t i = 0; i < HookList->Count; i++)
     {
-        if (HookList->Entries[i].FunctionAddress == FunctionAddress)
+        if (HookList->Entries[i] != NULL && HookList->Entries[i]->FunctionAddress == FunctionAddress)
         {
             found = true;
             // found the hook
 
             // disable the hook
-            HookList->Entries[i].Enabled = true;
+            HookList->Entries[i]->Enabled = true;
         }
     }
 
@@ -873,11 +1001,11 @@ CPTHK_STATUS cpthk_unhook(uintptr_t FunctionAddress)
     // loop through the hook list and find the hook
     for (size_t i = 0; i < HookList->Count; i++)
     {
-        if (HookList->Entries[i].FunctionAddress == FunctionAddress)
+        if (HookList->Entries[i] != NULL && HookList->Entries[i]->FunctionAddress == FunctionAddress)
         {
             found = true;
             // found the hook
-            PHOOK_ENTRY Entry = &HookList->Entries[i];
+            PHOOK_ENTRY Entry = HookList->Entries[i];
 
             // make function writable
             if (!cpthk_protect_function(Entry->Cfg, PAGE_EXECUTE_READWRITE))
@@ -907,6 +1035,73 @@ CPTHK_STATUS cpthk_unhook(uintptr_t FunctionAddress)
 
             // free the hook entry
             free((void *)Entry);
+            HookList->Entries[i] = NULL;
+
+            // shift the entries
+            for (size_t j = i; j < HookList->Count - 1; j++)
+            {
+                HookList->Entries[j] = HookList->Entries[j + 1];
+            }
+
+            // decrease the count
+            HookList->Count--;
+
+            break;
+        }
+    }
+
+    if (!cpthk_operate_threads(THREAD_OP_RESUME))
+        return CPTHK_UNABLE_TO_CONTROL_THREADS;
+
+    if (!found)
+        return CPTHK_HOOK_NOT_FOUND;
+
+    return CPTHK_OK;
+}
+
+CPTHK_STATUS cpthk_tiny_unhook(uintptr_t FunctionAddress)
+{
+    if (!HookListInitialized)
+        return CPTHK_NOT_INITIALIZED;
+
+    if (!cpthk_operate_threads(THREAD_OP_SUSPEND))
+        return CPTHK_UNABLE_TO_CONTROL_THREADS;
+
+    bool found = false;
+
+    // loop through the hook list and find the hook
+    for (size_t i = 0; i < HookList->Count; i++)
+    {
+        if (HookList->Entries[i] != NULL && HookList->Entries[i]->FunctionAddress == FunctionAddress)
+        {
+            found = true;
+            // found the hook
+            PHOOK_ENTRY Entry = HookList->Entries[i];
+
+            // make function writable
+            if (!cpthk_tiny_protect_function(Entry->FunctionAddress, PAGE_EXECUTE_READWRITE))
+            {
+                return CPTHK_UNABLE_TO_PROTECT_MEMORY;
+            }
+
+            // restore the original bytes
+            cpthk_restore(Entry->FunctionAddress, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
+
+            // restore the protection
+            if (!cpthk_tiny_protect_function(Entry->FunctionAddress, PAGE_EXECUTE_READ))
+            {
+                return CPTHK_UNABLE_TO_PROTECT_MEMORY;
+            }
+
+            // free the trampolines
+            free((void *)Entry->HookContext->HookTrampolineEntry);
+
+            // free the hook context
+            free((void *)Entry->HookContext);
+
+            // free the hook entry
+            free((void *)Entry);
+            HookList->Entries[i] = NULL;
 
             // shift the entries
             for (size_t j = i; j < HookList->Count - 1; j++)

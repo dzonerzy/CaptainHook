@@ -2,8 +2,6 @@ project('cpthook', 'c', version : '1.0', default_options : ['warning_level=3', '
 
 # Compiler
 cc = meson.get_compiler('c')
-python3 = find_program('python3')
-nasm = find_program('nasm')
 
 cpthook_inc_dirs = [
   include_directories('src/include/'),
