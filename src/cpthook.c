@@ -770,10 +770,7 @@ bool cpthk_tiny_hook_add_internal(uintptr_t Address, HOOKFNC HookEntry)
 
     // get the hookentry index
     int hookEntryIndex = HookList->Count++;
-    printf("hookEntryIndex: %d\n", hookEntryIndex);
     PHOOK_ENTRY *pEntry = &HookList->Entries[hookEntryIndex];
-
-    printf("*pEntry: %p\n", *pEntry);
 
     if (!*pEntry)
     {
@@ -812,7 +809,6 @@ bool cpthk_tiny_hook_add_internal(uintptr_t Address, HOOKFNC HookEntry)
 
         // Allocate space for the trampoline
         Entry->HookContext->HookTrampolineEntry = (uintptr_t)malloc(entryReplacedBytesSize + (15 * 6));
-        printf("HookTrampolineEntry: %p\n", Entry->HookContext->HookTrampolineEntry);
 
         if (!Entry->HookContext->HookTrampolineEntry)
         {
@@ -845,10 +841,26 @@ bool cpthk_tiny_hook_add_internal(uintptr_t Address, HOOKFNC HookEntry)
     return true;
 }
 
+bool cpthk_hook_exists(uintptr_t FunctionAddress)
+{
+    for (size_t i = 0; i < HookList->Count; i++)
+    {
+        if (HookList->Entries[i] != NULL && HookList->Entries[i]->FunctionAddress == FunctionAddress)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 CPTHK_STATUS cpthk_tiny_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook)
 {
     if (!HookListInitialized)
         return CPTHK_NOT_INITIALIZED;
+
+    if (cpthk_hook_exists(FunctionAddress))
+        return CPTHK_HOOK_ALREADY_EXISTS;
 
     if (!cpthk_operate_threads(THREAD_OP_SUSPEND))
         return CPTHK_UNABLE_TO_CONTROL_THREADS;
@@ -880,6 +892,9 @@ CPTHK_STATUS cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC Ex
 {
     if (!HookListInitialized)
         return CPTHK_NOT_INITIALIZED;
+
+    if (cpthk_hook_exists(FunctionAddress))
+        return CPTHK_HOOK_ALREADY_EXISTS;
 
     if (!cpthk_operate_threads(THREAD_OP_SUSPEND))
         return CPTHK_UNABLE_TO_CONTROL_THREADS;
@@ -1141,6 +1156,8 @@ char *cpthk_str_error(CPTHK_STATUS Status)
         return "Unable to control threads";
     case CPTHK_UNABLE_TO_PROTECT_MEMORY:
         return "Unable to protect memory";
+    case CPTHK_HOOK_ALREADY_EXISTS:
+        return "Hook already exists";
     case CPTHK_HOOK_NOT_FOUND:
         return "Hook not found";
     case CPTHK_UNABLE_TO_BUILD_CFG:

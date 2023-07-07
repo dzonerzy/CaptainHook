@@ -163,7 +163,6 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    printf("tiny hook on %p\n", test4i);
     printf("press enter to continue....\n");
     getchar();
 
