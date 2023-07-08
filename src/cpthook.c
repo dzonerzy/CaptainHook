@@ -8,8 +8,6 @@ ULONGLONG WINAPI cpthk_veh(EXCEPTION_POINTERS *Info)
 {
     if (Info->ExceptionRecord->ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION)
     {
-        printf("Exception on %p\n", Info->ExceptionRecord->ExceptionAddress);
-
         uintptr_t EAddr = (uintptr_t)Info->ExceptionRecord->ExceptionAddress;
         unsigned short index = *(unsigned short *)(EAddr + 2);
         unsigned char isEntry = *(unsigned char *)(EAddr + 4);
@@ -311,7 +309,7 @@ DWORD WINAPI cpthk_veh(EXCEPTION_POINTERS *Info)
         uintptr_t EAddr = (uintptr_t)Info->ExceptionRecord->ExceptionAddress;
         unsigned short index = *(unsigned short *)(EAddr + 2);
         unsigned char isEntry = *(unsigned char *)(EAddr + 4);
-        PHOOK_ENTRY entry = &HookList->Entries[index];
+        PHOOK_ENTRY entry = HookList->Entries[index];
 
         entry->HookContext->CpuContext = Info->ContextRecord;
 
@@ -475,7 +473,7 @@ CPTHK_STATUS cpthk_init(void)
 
     HookList->Size = 128;
     HookList->Count = 0;
-    HookList->Entries = (PHOOK_ENTRY)malloc(HookList->Size * sizeof(PHOOK_ENTRY));
+    HookList->Entries = (PHOOK_ENTRY *)malloc(HookList->Size * sizeof(PHOOK_ENTRY));
 
     memset(HookList->Entries, 0, HookList->Size * sizeof(PHOOK_ENTRY));
 
@@ -495,7 +493,7 @@ CPTHK_STATUS cpthk_uninit(void)
 
     for (unsigned long i = 0; i < HookList->Count; i++)
     {
-        PHOOK_ENTRY entry = &HookList->Entries[i];
+        PHOOK_ENTRY entry = HookList->Entries[i];
         if (entry->HookContext)
         {
             free((void *)entry->HookContext->HookTrampolineEntry);
@@ -628,7 +626,7 @@ bool cpthk_hook_add_internal(PCONTROL_FLOW_GRAPH Cfg, PCALLING_CONVENTION Callin
     if (HookList->Count + 1 >= HookList->Size)
     {
         HookList->Size += 10;
-        HookList->Entries = (PHOOK_ENTRY)realloc(HookList->Entries, HookList->Size * sizeof(PHOOK_ENTRY));
+        HookList->Entries = (PHOOK_ENTRY *)realloc(HookList->Entries, HookList->Size * sizeof(PHOOK_ENTRY));
         if (!HookList->Entries)
         {
             HookList->Size -= 10;
@@ -760,7 +758,7 @@ bool cpthk_tiny_hook_add_internal(uintptr_t Address, HOOKFNC HookEntry)
     if (HookList->Count + 1 >= HookList->Size)
     {
         HookList->Size += 10;
-        HookList->Entries = (PHOOK_ENTRY)realloc(HookList->Entries, HookList->Size * sizeof(PHOOK_ENTRY));
+        HookList->Entries = (PHOOK_ENTRY *)realloc(HookList->Entries, HookList->Size * sizeof(PHOOK_ENTRY));
         if (!HookList->Entries)
         {
             HookList->Size -= 10;

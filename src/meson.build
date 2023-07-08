@@ -19,3 +19,7 @@ endforeach
 subdir('fadec')
 
 sources += fadec_sources
+
+subdir('fcm')
+
+sources += fcm_sources

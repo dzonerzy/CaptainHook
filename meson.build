@@ -6,6 +6,7 @@ cc = meson.get_compiler('c')
 cpthook_inc_dirs = [
   include_directories('src/include/'),
   include_directories('src/fadec/include/'),
+  include_directories('src/fcm/include/'),
 ]
 
 # Sources
@@ -14,6 +15,16 @@ subdir('src')
 # Options
 if cc.get_argument_syntax() != 'msvc'
   add_project_arguments('-Wno-unused-parameter', language: 'c')
+  add_project_arguments('-Wno-missing-field-initializers', language: 'c')
+  add_project_arguments('-Wno-unused-variable', language: 'c')
+  add_project_arguments('-Wno-sign-compare', language: 'c')   
+  add_project_arguments('-Wno-gnu-zero-variadic-macro-arguments', language: 'c')
+  add_project_arguments('-Wno-strict-prototypes', language: 'c')
+  add_project_arguments('-Wno-pedantic', language: 'c')
+  add_project_arguments('-Wno-unused-but-set-variable', language: 'c')
+  add_project_arguments('-Wno-bitwise-conditional-parentheses', language: 'c')
+  add_project_arguments('-Wno-constant-logical-operand', language: 'c')
+  add_project_arguments('-Wno-parentheses', language: 'c')
   if get_option('arch') == '32'
     add_project_arguments('-m32', language: 'c')
     add_project_link_arguments('-m32', language: 'c')
@@ -37,6 +48,10 @@ if get_option('tests')
   subdir('tests')
 endif
 
+if get_option('fcm_test')
+  subdir('fcm_test')
+endif
+
 libcpthook = static_library('cpthook', 
   sources,
   include_directories: cpthook_inc_dirs,
@@ -51,6 +66,22 @@ if get_option('tests')
   tests = executable('cpthook_tests', 
     tests_sources,
     include_directories: cpthook_inc_dirs,
+    link_with: libcpthook,
+    install: false,
+  )
+endif
+
+if get_option('fcm_test')
+  fcm_test = executable('fcm_test', 
+    fcm_test_sources,
+    include_directories: fcm_test_inc_dirs,
+    link_with: libcpthook,
+    install: false,
+  )
+
+  fcm_disasm = executable('fcm_disasm', 
+    fcm_disasm_sources,
+    include_directories: fcm_test_inc_dirs,
     link_with: libcpthook,
     install: false,
   )

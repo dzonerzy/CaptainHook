@@ -1,0 +1,50 @@
+raw_sources = [
+    'fcml_apc_ast.c',
+    'fcml_assembler.c',
+    'fcml_ceh.c',
+    'fcml_choosers.c',
+    'fcml_coll.c',
+    'fcml_common_dialect.c',
+    'fcml_common_utils.c',
+    'fcml_decoding_tree.c',
+    'fcml_def.c',
+    'fcml_def_enc.c',
+    'fcml_dialect.c',
+    'fcml_dialect_int.c',
+    'fcml_disassembler.c',
+    'fcml_disp8_n.c',
+    'fcml_encoding.c',
+    'fcml_env_int.c',
+    'fcml_gas_dialect.c',
+    'fcml_gas_lexer.c',
+    'fcml_gas_parser.c',
+    'fcml_gas_parser_def.c',
+    'fcml_gas_rend.c',
+    'fcml_hints.c',
+    'fcml_intel_dialect.c',
+    'fcml_intel_lexer.c',
+    'fcml_intel_parser.c',
+    'fcml_intel_parser_def.c',
+    'fcml_intel_rend.c',
+    'fcml_lag_assembler.c',
+    'fcml_messages.c',
+    'fcml_mnemonic_parser.c',
+    'fcml_modrm_decoder.c',
+    'fcml_modrm_encoder.c',
+    'fcml_operand_decorators.c',
+    'fcml_optimizers.c',
+    'fcml_parser.c',
+    'fcml_parser_int.c',
+    'fcml_parser_utils.c',
+    'fcml_renderer.c',
+    'fcml_rend_utils.c',
+    'fcml_stream.c',
+    'fcml_symbols.c',
+    'fcml_utils.c'
+]
+
+fcm_sources = []
+
+foreach source : raw_sources
+  fcm_sources += 'src/fcm/src/' + source
+endforeach
