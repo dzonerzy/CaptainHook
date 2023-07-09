@@ -15,8 +15,8 @@
 #define HOOKSIZE 5
 
 // Utilities
-#define CPTHK_HOOK_NAME(fnc) cpthk_##fnc##_hook
-#define CPTHK_HOOKFNC(fnc) void __stdcall cpthk_##fnc##_hook(PCPTHOOK_CTX ctx)
+#define CPTHK_HOOK_NAME(fnc) cpthk_##fnc
+#define CPTHK_HOOKFNC(fnc) void __stdcall cpthk_##fnc(PCPTHOOK_CTX ctx)
 #if defined(_WIN64)
 #define CPTHK_REG_AX(ctx) ((ctx)->CpuContext->Rax)
 #define CPTHK_REG_BX(ctx) ((ctx)->CpuContext->Rbx)
@@ -83,6 +83,20 @@ typedef struct _HOOK_LIST
     PHOOK_ENTRY *Entries;
 } HOOK_LIST, *PHOOK_LIST;
 
+typedef struct _TRAMP_ENTRY
+{
+    uintptr_t FunctionAddress;
+    uintptr_t TrampolineAddress;
+    PCONTROL_FLOW_GRAPH Cfg;
+} TRAMP_ENTRY, *PTRAMP_ENTRY;
+
+typedef struct _TRAMP_LIST
+{
+    unsigned long Size;
+    unsigned long Count;
+    PTRAMP_ENTRY *Entries;
+} TRAMP_LIST, *PTRAMP_LIST;
+
 typedef struct _JMP_TABLE
 {
     uintptr_t *TableEntry;
@@ -91,7 +105,8 @@ typedef struct _JMP_TABLE
 } JMP_TABLE, *PJMP_TABLE;
 
 extern PHOOK_LIST HookList;
-extern bool HookListInitialized;
+extern PTRAMP_LIST TrampList;
+extern bool CpthkInitialized;
 
 typedef enum CPTHK_STATUS
 {

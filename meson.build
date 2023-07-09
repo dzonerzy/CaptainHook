@@ -1,4 +1,4 @@
-project('cpthook', 'c', version : '1.0', default_options : ['warning_level=3', 'c_std=c11'],  meson_version: '>=1.1.0')
+project('cpthook', 'c', version : '0.2.1', default_options : ['warning_level=3', 'c_std=c11'],  meson_version: '>=1.1.0')
 
 # Compiler
 cc = meson.get_compiler('c')
@@ -65,7 +65,7 @@ libcpthook = static_library('cpthook',
 if get_option('tests')
   tests = executable('cpthook_tests', 
     tests_sources,
-    include_directories: cpthook_inc_dirs,
+    include_directories: tests_inc_dirs,
     link_with: libcpthook,
     install: false,
   )

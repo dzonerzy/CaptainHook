@@ -1,11 +1,12 @@
 tests_raw_sources = [
-    'tests.c',
+    'main.c',
+    'tests_a.c',
 ]
 
 tests_sources = []
 
 foreach source : tests_raw_sources
-  tests_sources += 'tests/' + source
+  tests_sources += 'tests/src/' + source
 endforeach
 
 if cc.get_argument_syntax() != 'msvc'
@@ -15,4 +16,6 @@ else
   add_project_arguments('-fno-stack-protector', language: 'c')
 endif
 
-tests_inc_dirs = cpthook_inc_dirs
+tests_inc_dirs = cpthook_inc_dirs + [
+  include_directories('./include'),
+]

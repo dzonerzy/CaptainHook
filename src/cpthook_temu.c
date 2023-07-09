@@ -1186,18 +1186,21 @@ PCALLING_CONVENTION cpthk_emu_traces(PINST_TRACE_LIST list, PTEMU_CPU_CONTEXT Cp
             {
                 if (logger.TraceLog[i].Trace.Lt == TRACE_REG && (logger.TraceLog[i].Trace.LValue.RegValue.RegValue != FD_REG_SP && logger.TraceLog[i].Trace.LValue.RegValue.RegValue != FD_REG_BP))
                 {
-                    cc->ReturnArg.Position.Reg = logger.TraceLog[i].Trace.LValue.RegValue.RegValue;
-                    cc->ReturnArg.Position.Offset = 0;
-                    cc->ReturnArg.Gpr = logger.TraceLog[i].Trace.LValue.RegValue.gpr ? true : false;
-                    cc->ReturnArg.Fpu = logger.TraceLog[i].Trace.LValue.RegValue.fpu ? true : false;
-                    cc->ReturnArg.Vec = logger.TraceLog[i].Trace.LValue.RegValue.vec ? true : false;
-                    cc->ReturnArg.Instruction = logger.TraceLog[i].Trace.Instr;
-                    cc->ReturnArg.Used = true;
-                    cc->ReturnArg.Size = FD_SIZE(&logger.TraceLog[i].Trace.Instr);
-                    cc->ReturnArg.Type = ARG_TYPE_INT;
-                    cc->ReturnArg.Stack = false;
-                    cc->ExitHookAddress = logger.TraceLog[i].Trace.Address + FD_SIZE(&logger.TraceLog[i].Trace.Instr);
-                    break;
+                    if (logger.TraceLog[i].Trace.LValue.RegValue.RegValue == FD_REG_AX)
+                    {
+                        cc->ReturnArg.Position.Reg = logger.TraceLog[i].Trace.LValue.RegValue.RegValue;
+                        cc->ReturnArg.Position.Offset = 0;
+                        cc->ReturnArg.Gpr = logger.TraceLog[i].Trace.LValue.RegValue.gpr ? true : false;
+                        cc->ReturnArg.Fpu = logger.TraceLog[i].Trace.LValue.RegValue.fpu ? true : false;
+                        cc->ReturnArg.Vec = logger.TraceLog[i].Trace.LValue.RegValue.vec ? true : false;
+                        cc->ReturnArg.Instruction = logger.TraceLog[i].Trace.Instr;
+                        cc->ReturnArg.Used = true;
+                        cc->ReturnArg.Size = FD_SIZE(&logger.TraceLog[i].Trace.Instr);
+                        cc->ReturnArg.Type = ARG_TYPE_INT;
+                        cc->ReturnArg.Stack = false;
+                        cc->ExitHookAddress = logger.TraceLog[i].Trace.Address + FD_SIZE(&logger.TraceLog[i].Trace.Instr);
+                        break;
+                    }
                 }
                 else if (logger.TraceLog[i].Trace.Lt == TRACE_OFFSET)
                 {

@@ -1,7 +1,8 @@
 #include <cpthook.h>
 
 PHOOK_LIST HookList = NULL;
-bool HookListInitialized = false;
+PTRAMP_LIST TrampList = NULL;
+bool CpthkInitialized = false;
 
 #if defined(_WIN64)
 ULONGLONG WINAPI cpthk_veh(EXCEPTION_POINTERS *Info)
@@ -477,12 +478,28 @@ CPTHK_STATUS cpthk_init(void)
 
     memset(HookList->Entries, 0, HookList->Size * sizeof(PHOOK_ENTRY));
 
+    if (TrampList)
+        return CPTHK_ALREADY_INITIALIZED;
+
+    TrampList = (PTRAMP_LIST)malloc(sizeof(TRAMP_LIST));
+
+    if (!TrampList)
+        return CPTHK_OUT_OF_MEMORY;
+
+    memset(TrampList, 0, sizeof(TRAMP_LIST));
+
+    TrampList->Size = 128;
+    TrampList->Count = 0;
+    TrampList->Entries = (PTRAMP_ENTRY *)malloc(TrampList->Size * sizeof(PTRAMP_ENTRY));
+
+    memset(TrampList->Entries, 0, TrampList->Size * sizeof(PTRAMP_ENTRY));
+
     if (!AddVectoredExceptionHandler(1, (PVECTORED_EXCEPTION_HANDLER)cpthk_veh))
     {
         return CPTHK_ERROR;
     }
 
-    HookListInitialized = true;
+    CpthkInitialized = true;
     return CPTHK_OK;
 }
 
@@ -505,7 +522,24 @@ CPTHK_STATUS cpthk_uninit(void)
 
     free((void *)HookList);
     HookList = NULL;
-    HookListInitialized = false;
+
+    if (!TrampList)
+        return CPTHK_NOT_INITIALIZED;
+
+    for (unsigned long i = 0; i < TrampList->Count; i++)
+    {
+        PTRAMP_ENTRY entry = TrampList->Entries[i];
+        if (entry->TrampolineAddress)
+        {
+            free((void *)entry->TrampolineAddress);
+            entry->TrampolineAddress = 0;
+        }
+    }
+
+    free((void *)TrampList);
+    TrampList = NULL;
+
+    CpthkInitialized = false;
 
     return CPTHK_OK;
 }
@@ -753,6 +787,18 @@ bool cpthk_hook_add_internal(PCONTROL_FLOW_GRAPH Cfg, PCALLING_CONVENTION Callin
     return true;
 }
 
+bool cpthk_is_jmp(uintptr_t Address)
+{
+    unsigned char *pAddress = (unsigned char *)Address;
+    return (pAddress[0] == 0xFF && pAddress[1] == 0x25);
+}
+
+uintptr_t cpthk_get_jmp_address(uintptr_t Address)
+{
+    unsigned char *pAddress = (unsigned char *)Address;
+    return *(uintptr_t *)(pAddress + 2 + *(int32_t *)(pAddress + 2));
+}
+
 bool cpthk_tiny_hook_add_internal(uintptr_t Address, HOOKFNC HookEntry)
 {
     if (HookList->Count + 1 >= HookList->Size)
@@ -792,6 +838,14 @@ bool cpthk_tiny_hook_add_internal(uintptr_t Address, HOOKFNC HookEntry)
 
     if (HookEntry && Address)
     {
+        // check if address is a JMP instruction that usually happen with visual studio
+        if (cpthk_is_jmp(Address))
+        {
+            // get the address of the function
+            Address = cpthk_get_jmp_address(Address);
+            Entry->FunctionAddress = Address;
+        }
+
         // write the jmp to the entry hook
         unsigned char originalEntryBytes[HOOKSIZE + 15];
         size_t entryReplacedBytesSize = cpthk_write_ud2(Address, (unsigned char *)&originalEntryBytes, true);
@@ -854,7 +908,7 @@ bool cpthk_hook_exists(uintptr_t FunctionAddress)
 
 CPTHK_STATUS cpthk_tiny_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook)
 {
-    if (!HookListInitialized)
+    if (!CpthkInitialized)
         return CPTHK_NOT_INITIALIZED;
 
     if (cpthk_hook_exists(FunctionAddress))
@@ -888,7 +942,7 @@ CPTHK_STATUS cpthk_tiny_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook)
 
 CPTHK_STATUS cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC ExitHook)
 {
-    if (!HookListInitialized)
+    if (!CpthkInitialized)
         return CPTHK_NOT_INITIALIZED;
 
     if (cpthk_hook_exists(FunctionAddress))
@@ -935,7 +989,7 @@ CPTHK_STATUS cpthk_hook(uintptr_t FunctionAddress, HOOKFNC EntryHook, HOOKFNC Ex
 
 CPTHK_STATUS cpthk_disable(uintptr_t FunctionAddress)
 {
-    if (!HookListInitialized)
+    if (!CpthkInitialized)
         return CPTHK_NOT_INITIALIZED;
 
     if (!cpthk_operate_threads(THREAD_OP_SUSPEND))
@@ -969,7 +1023,7 @@ CPTHK_STATUS cpthk_disable(uintptr_t FunctionAddress)
 
 CPTHK_STATUS cpthk_enable(uintptr_t FunctionAddress)
 {
-    if (!HookListInitialized)
+    if (!CpthkInitialized)
         return CPTHK_NOT_INITIALIZED;
 
     if (!cpthk_operate_threads(THREAD_OP_SUSPEND))
@@ -1003,7 +1057,7 @@ CPTHK_STATUS cpthk_enable(uintptr_t FunctionAddress)
 
 CPTHK_STATUS cpthk_unhook(uintptr_t FunctionAddress)
 {
-    if (!HookListInitialized)
+    if (!CpthkInitialized)
         return CPTHK_NOT_INITIALIZED;
 
     if (!cpthk_operate_threads(THREAD_OP_SUSPEND))
@@ -1027,8 +1081,10 @@ CPTHK_STATUS cpthk_unhook(uintptr_t FunctionAddress)
             }
 
             // restore the original bytes
-            cpthk_restore(Entry->HookContext->CallingConvention->EntryHookAddress, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
-            cpthk_restore(Entry->HookContext->CallingConvention->ExitHookAddress, Entry->OriginalExitBytes, Entry->OriginalExitSize);
+            if (Entry->HookContext->EntryHook)
+                cpthk_restore(Entry->HookContext->CallingConvention->EntryHookAddress, Entry->OriginalEntryBytes, Entry->OriginalEntrySize);
+            if (Entry->HookContext->ExitHook)
+                cpthk_restore(Entry->HookContext->CallingConvention->ExitHookAddress, Entry->OriginalExitBytes, Entry->OriginalExitSize);
 
             // restore the protection
             if (!cpthk_protect_function(Entry->Cfg, PAGE_EXECUTE_READ))
@@ -1074,7 +1130,7 @@ CPTHK_STATUS cpthk_unhook(uintptr_t FunctionAddress)
 
 CPTHK_STATUS cpthk_tiny_unhook(uintptr_t FunctionAddress)
 {
-    if (!HookListInitialized)
+    if (!CpthkInitialized)
         return CPTHK_NOT_INITIALIZED;
 
     if (!cpthk_operate_threads(THREAD_OP_SUSPEND))
@@ -1175,5 +1231,5 @@ char *cpthk_str_error(CPTHK_STATUS Status)
 
 char *cpthk_version(void)
 {
-    return "CaptainHook v" VERSION_STR(MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION, CODENAME);
+    return VERSION_STR(MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION, CODENAME);
 }

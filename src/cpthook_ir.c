@@ -770,12 +770,6 @@ PINST_TRACE_LIST cpthk_get_instr_trace(uint8_t *Buffer, size_t Size, TRACE_POINT
                 default:
                     break;
                 }
-
-                if (traceEntry.LValue.RegValue.vec)
-                {
-                    printf("FPU register used as left operand\n");
-                }
-
                 valid = true;
                 break;
             case FDI_LEA:
@@ -1190,9 +1184,17 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
         if (list3)
         {
             returnCallingConvention = cpthk_emu_traces(list3, &cpu, TEMU_PRIORITIZE_WRITE_FLAG, TEMU_ANAL_RETURN);
-            if (returnCallingConvention->ReturnArg.Position.Reg != FD_REG_NONE)
+            if (returnCallingConvention->ReturnArg.Position.Reg == FD_REG_NONE && cfg->Tail->Address == 0)
             {
                 retFound = true;
+                returnCallingConvention->ReturnArg.Gpr = true;
+                returnCallingConvention->ReturnArg.Fpu = false;
+                returnCallingConvention->ReturnArg.Vec = false;
+                returnCallingConvention->ReturnArg.Used = true;
+                returnCallingConvention->ReturnArg.Size = 2;
+                returnCallingConvention->ReturnArg.Type = ARG_TYPE_INT;
+                returnCallingConvention->ReturnArg.Stack = false;
+                returnCallingConvention->ReturnArg.Position.Reg = FD_REG_AX;
                 returnCallingConvention->ExitHookAddress = cfg->Tail->Address;
             }
         }
@@ -1209,7 +1211,7 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
     // free(cfg);
     free(returnCallingConvention);
 
-    printf("Calling convention:\n");
+    /*printf("Calling convention:\n");
     printf("  Return register: %d\n", paramCallingConvention->ReturnArg.Position.Reg);
     printf("  Argument count: %d\n", paramCallingConvention->ArgumentsCount);
     printf("  Arguments:\n");
@@ -1220,7 +1222,7 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
         printf("        %d: %s\n", i, buf);
     }
     printf("  EntryHookAddress: %p\n", paramCallingConvention->EntryHookAddress);
-    printf("  ExitHookAddress: %p\n", paramCallingConvention->ExitHookAddress);
+    printf("  ExitHookAddress: %p\n", paramCallingConvention->ExitHookAddress);*/
 
     return paramCallingConvention;
 }

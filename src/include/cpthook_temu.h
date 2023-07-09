@@ -27,7 +27,7 @@ typedef struct _TEMU_MEM
 
 typedef struct _TEMU_CPU_CONTEXT
 {
-    TEMU_REGISTER GeneralRegisters[16];
+    TEMU_REGISTER GeneralRegisters[17]; // 16 + 1 for RIP
     TEMU_REGISTER FPURegisters[16];
     TEMU_REGISTER XMMRegisters[16];
     TEMU_MEM Stack;
