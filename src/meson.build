@@ -23,3 +23,7 @@ sources += fadec_sources
 subdir('fcm')
 
 sources += fcm_sources
+
+subdir('quickjs')
+
+sources += qjs_sources

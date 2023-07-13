@@ -7,6 +7,7 @@ cpthook_inc_dirs = [
   include_directories('src/include/'),
   include_directories('src/fadec/include/'),
   include_directories('src/fcm/include/'),
+  include_directories('src/quickjs/include/'),
 ]
 
 # Sources
@@ -25,6 +26,8 @@ if cc.get_argument_syntax() != 'msvc'
   add_project_arguments('-Wno-bitwise-conditional-parentheses', language: 'c')
   add_project_arguments('-Wno-constant-logical-operand', language: 'c')
   add_project_arguments('-Wno-parentheses', language: 'c')
+  add_project_arguments('-Wno-implicit-const-int-float-conversion', language: 'c')
+  add_project_arguments('-Wno-unused-result', language: 'c')
   if get_option('arch') == '32'
     add_project_arguments('-m32', language: 'c')
     add_project_link_arguments('-m32', language: 'c')
@@ -46,10 +49,6 @@ endif
 
 if get_option('tests')
   subdir('tests')
-endif
-
-if get_option('fcm_test')
-  subdir('fcm_test')
 endif
 
 libcpthook = static_library('cpthook', 

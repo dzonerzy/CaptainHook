@@ -1,3 +1,4 @@
 option('arch', type: 'combo', choices: ['32', '64'])
 option('tests', type: 'boolean', value: false)
 option('fcm_test', type: 'boolean', value: false)
+option('qjs_test', type: 'boolean', value: false)

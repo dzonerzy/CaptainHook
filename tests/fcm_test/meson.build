@@ -11,14 +11,14 @@ fcm_test_sources = []
 fcm_disasm_sources = []
 
 foreach source : fcm_test_raw_sources
-  fcm_test_sources += 'fcm_test/' + source
+  fcm_test_sources += 'tests/fcm_test/' + source
 endforeach
 
 foreach source : fcm_disasm_raw_sources
-  fcm_disasm_sources += 'fcm_test/' + source
+  fcm_disasm_sources += 'tests/fcm_test/' + source
 endforeach
 
 
 fcm_test_inc_dirs = [
-  include_directories('../src/fcm/include/'),
+  include_directories('../../src/fcm/include/'),
 ]

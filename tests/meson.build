@@ -1,3 +1,7 @@
+if get_option('fcm_test')
+  subdir('fcm_test')
+endif
+
 tests_raw_sources = [
     'main.c',
     'tests_a.c',

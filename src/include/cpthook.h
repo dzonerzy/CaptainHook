@@ -3,6 +3,7 @@
 #include <cpthook_anal.h>
 #include <cpthook_ir.h>
 #include <cpthook_temu.h>
+#include <cpthook_js.h>
 
 // Versioning
 #define MAJOR_VERSION "0"
