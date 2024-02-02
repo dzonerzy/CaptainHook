@@ -1,3 +1,9 @@
+/*
+ * CaptainHook - A prototype-less hooking library for Windows
+ *
+ * This is the main header file for the CaptainHook library. It contains all
+ * the necessary definitions and function prototypes to use the library.
+ */
 #pragma once
 #include <windows.h>
 #include <stdint.h>

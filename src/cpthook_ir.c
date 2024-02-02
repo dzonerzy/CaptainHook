@@ -1207,11 +1207,11 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
     cpthk_free_trace_list(list);
     cpthk_free_trace_list(list2);
     cpthk_free_trace_list(list3);
-    // cpthk_free_hashmap(cfg->Map);
-    // free(cfg);
     free(returnCallingConvention);
 
-    /*printf("Calling convention:\n");
+#ifdef CPTHOOK_DEBUG
+
+    printf("Calling convention:\n");
     printf("  Return register: %d\n", paramCallingConvention->ReturnArg.Position.Reg);
     printf("  Argument count: %d\n", paramCallingConvention->ArgumentsCount);
     printf("  Arguments:\n");
@@ -1222,7 +1222,9 @@ PCALLING_CONVENTION cpthk_find_calling_convention(PCONTROL_FLOW_GRAPH cfg)
         printf("        %d: %s\n", i, buf);
     }
     printf("  EntryHookAddress: %p\n", paramCallingConvention->EntryHookAddress);
-    printf("  ExitHookAddress: %p\n", paramCallingConvention->ExitHookAddress);*/
+    printf("  ExitHookAddress: %p\n", paramCallingConvention->ExitHookAddress);
+
+#endif
 
     return paramCallingConvention;
 }

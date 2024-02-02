@@ -22,5 +22,5 @@
 [x] fixed hooking remove heap-user-after-free
 [x] disallow multiple hook on same address or change the way it works (instead of hook index search for hook hash)
 [ ] add cpthk_create_trampoline this basically allow call the function with custom args, it's not an hook but a remote function definition 
-[ ] add js scripting engine (quickjs)
+[ ] add js scripting engine (quickjs) (WIP)
 [ ] create basic js classes to handle hooking, tinyhooking and trampolines
