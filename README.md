@@ -29,7 +29,7 @@ void __stdcall cpthk_factorial_hook_entry(CPTHOOK_CTX *ctx)
     cpthk_set_param_int(ctx, 0, 9);
 }
 
-void __stdcall cpthk_factorial_hook_exit2(CPTHOOK_CTX *ctx)
+void __stdcall cpthk_factorial_hook_exit(CPTHOOK_CTX *ctx)
 {
     uintptr_t *ret = cpthk_get_return_param(ctx);
     factorial_hook_result = *ret;
@@ -41,7 +41,7 @@ void main(int argc, char ** argv)
     CPTHK_STATUS status = cpthk_init();
     ASSERT(status == CPTHK_OK);
 
-    status = cpthk_hook((uintptr_t)factorial, CPTHK_HOOK_NAM(factorial_hook_entry2), CPTHK_HOOK_NAME(factorial_hook_exit2));
+    status = cpthk_hook((uintptr_t)factorial, CPTHK_HOOK_NAME(factorial_hook_entry), CPTHK_HOOK_NAME(factorial_hook_exit));
 
     ASSERT(status == CPTHK_OK);
 
